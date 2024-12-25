@@ -91,7 +91,19 @@ class DocumentProcessor:
                 matches = re.findall(pattern, text, re.MULTILINE | re.IGNORECASE)
                 if matches:
                     if field == 'total_amount':
-                        metadata[field] = matches[0][0] if isinstance(matches[0], tuple) else matches[0]
+                        # Handle both German (1.234,56) and English (1,234.56) number formats
+                        amount = matches[0][0] if isinstance(matches[0], tuple) else matches[0]
+                        # Remove any currency symbols and whitespace
+                        amount = re.sub(r'[^\d,.]', '', amount)
+                        # Convert German format to English if needed
+                        if ',' in amount and '.' in amount:
+                            if amount.rindex('.') < amount.rindex(','):
+                                # German format (1.234,56) -> English format (1234.56)
+                                amount = amount.replace('.', '').replace(',', '.')
+                        elif ',' in amount and '.' not in amount:
+                            # Assume German format with only comma
+                            amount = amount.replace(',', '.')
+                        metadata[field] = amount
                     else:
                         metadata[field] = matches[0]
                 logger.debug(f"Field {field}: {'found' if matches else 'not found'}")

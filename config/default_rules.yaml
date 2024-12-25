@@ -8,6 +8,13 @@ rules:
       - total
       - due date
       - invoice number
+      # German keywords
+      - rechnung
+      - betrag
+      - summe
+      - belegdatum
+      - rechnungsnummer
+      - belegnummer
     metadata_fields:
       - invoice_number
       - date
@@ -22,6 +29,10 @@ rules:
       - parties
       - hereby
       - obligations
+      # German keywords
+      - vertrag
+      - vereinbarung
+      - bedingungen
     metadata_fields:
       - contract_id
       - parties
@@ -36,6 +47,10 @@ rules:
       - findings
       - conclusion
       - recommendations
+      # German keywords
+      - bericht
+      - analyse
+      - zusammenfassung
     metadata_fields:
       - report_type
       - period
@@ -43,10 +58,10 @@ rules:
       - date
 
 extraction_patterns:
-  invoice_number: '(?i)(?:invoice|bill)(?:\s+(?:no|number|#)?[:.\s]*)([\w-]+)'
-  date: '(?:\d{2}[-/]\d{2}[-/]\d{4})|(?:\w+\s+\d{1,2},?\s+\d{4})'
-  total_amount: '(?i)(?:total|amount|sum)[\s:]*[$€£]?\s*([\d,]+\.?\d*)'
-  due_date: '(?i)due\s+(?:date|by)?[\s:]*(\d{2}[-/]\d{2}[-/]\d{4})'
-  contract_id: '(?i)(?:contract|agreement)(?:\s+(?:no|number|#)?[:.\s]*)([\w-]+)'
-  effective_date: '(?i)effective\s+date[\s:]*(\d{2}[-/]\d{2}[-/]\d{4})'
-  expiration_date: '(?i)(?:expiration|termination)\s+date[\s:]*(\d{2}[-/]\d{2}[-/]\d{4})'
+  invoice_number: '(?i)(?:invoice|bill|rechnung|beleg)(?:\s*(?:no|number|nummer|#)?[:.\s]*)([\w-]+)'
+  date: '(?:\d{2}[-/.]\d{2}[-/.]\d{4})|(?:\w+\s+\d{1,2},?\s+\d{4})'
+  total_amount: '(?i)(?:total|amount|sum|betrag|summe|rechnungsbetrag)[\s:]*[$€£]?\s*([\d,.]+(?:[\.,]\d{2})?)'
+  due_date: '(?i)(?:due|fällig|zahlbar)\s+(?:date|bis|am)?[\s:]*(\d{2}[-/.]\d{2}[-/.]\d{4})'
+  contract_id: '(?i)(?:contract|agreement|vertrag|vereinbarung)(?:\s*(?:no|number|nummer|#)?[:.\s]*)([\w-]+)'
+  effective_date: '(?i)(?:effective|gültig\s+ab)\s+date[\s:]*(\d{2}[-/.]\d{2}[-/.]\d{4})'
+  expiration_date: '(?i)(?:expiration|termination|gültig\s+bis)\s+date[\s:]*(\d{2}[-/.]\d{2}[-/.]\d{4})'
