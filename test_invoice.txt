@@ -1,0 +1,19 @@
+INVOICE #INV2024001
+
+Bill To:
+John Doe
+123 Main St
+San Francisco, CA 94105
+
+Date: 12/25/2024
+Due Date: 01/25/2025
+
+Description                     Amount
+--------------------------------
+Web Development Services      $1,500.00
+Hosting Services (Monthly)    $  150.00
+--------------------------------
+Total Amount:                $1,650.00
+
+Payment Terms: Net 30
+Please make checks payable to: DocFlow Solutions

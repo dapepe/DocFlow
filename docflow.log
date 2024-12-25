@@ -1,0 +1,5 @@
+2024-12-25 20:27:42,792 - docflow.processor - ERROR - Error processing document test_invoice.txt: module 'docling' has no attribute 'Document'
+2024-12-25 20:27:42,796 - docflow.cli - ERROR - CLI processing error: module 'docling' has no attribute 'Document'
+2024-12-25 20:28:21,182 - docflow.processor - INFO - Successfully processed document: test_invoice.txt
+2024-12-25 20:28:38,407 - docflow.processor - INFO - Successfully processed document: test_invoice.txt
+2024-12-25 20:29:13,160 - docflow.processor - INFO - Successfully processed document: test_invoice.txt
