@@ -31,6 +31,8 @@ class DocumentProcessor:
                 text = ""
                 for page in pdf.pages:
                     text += page.extract_text() + "\n"
+                # Log entire text in debug mode
+                logger.debug(f"Full PDF text extracted:\n{text}")
                 return text
         except Exception as e:
             logger.error(f"Error extracting text from PDF: {e}")
@@ -74,19 +76,25 @@ class DocumentProcessor:
         return extracted_text
 
     def _extract_metadata(self, text: str, doc_type: str) -> Dict:
+        """Extract metadata using patterns from rules"""
         metadata = {}
         patterns = self.rules.get('extraction_patterns', {})
         fields = self.rules.get('rules', {}).get(doc_type, {}).get('metadata_fields', [])
 
+        logger.debug(f"Attempting to extract metadata for type '{doc_type}'")
+        logger.debug(f"Available fields: {fields}")
+
         for field in fields:
             if field in patterns:
-                matches = re.findall(patterns[field], text)
+                pattern = patterns[field]
+                logger.debug(f"Using pattern for {field}: {pattern}")
+                matches = re.findall(pattern, text, re.MULTILINE | re.IGNORECASE)
                 if matches:
-                    # For total_amount, only take the full amount, not the decimal part
                     if field == 'total_amount':
-                        metadata[field] = matches[0][0]  # Get the full amount
+                        metadata[field] = matches[0][0] if isinstance(matches[0], tuple) else matches[0]
                     else:
                         metadata[field] = matches[0]
+                logger.debug(f"Field {field}: {'found' if matches else 'not found'}")
 
         return metadata
 

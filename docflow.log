@@ -35,3 +35,73 @@ Please make checks payable to: DocFlow Solutions
 2024-12-25 20:35:20,459 - docflow.processor - DEBUG - Document type 'report' matched 0 keywords
 2024-12-25 20:35:20,459 - docflow.processor - DEBUG - Final classification: invoice
 2024-12-25 20:35:20,460 - docflow.processor - INFO - Successfully processed document: test_invoice.txt
+2024-12-25 20:35:38,299 - docflow.processor - DEBUG - Extracted text preview from tmpp1j8n5jv.pdf: Rechnung
+Belegdatum
+Kundennummer
+Belegnummer
+Seite15.02.2023
+22290
+202379890
+1ZeyOS GmbH & Co. KG
+Peter Haider
+Stepbergweg 5
+82491 Grainau
+Net-Build GmbH
+Alfred-Nobel-Allee 38
+66793 Saarwellingen
+Telefon: 06831 51677-0
+Telefax: 06831 51677-20
+E-Mail: info@netbuild.netKreissparkasse Saarlouis
+DE92 5935 0110 0370 0256 29
+KRSADE55XXX
+Deutsche Bank
+DE72 5907 0070 0606 1188 00
+DEUTDEDB595USt-Id Nummer
+DE 241550548
+Registernummer
+HR B 15070
+Registergericht
+Amtsgericht SaarbrückenGeschäftsführer
+Patric
+2024-12-25 20:35:38,300 - docflow.processor - DEBUG - Starting document classification
+2024-12-25 20:35:38,301 - docflow.processor - DEBUG - Document type 'invoice' matched 0 keywords
+2024-12-25 20:35:38,301 - docflow.processor - DEBUG - Document type 'contract' matched 0 keywords
+2024-12-25 20:35:38,301 - docflow.processor - DEBUG - Document type 'report' matched 0 keywords
+2024-12-25 20:35:38,301 - docflow.processor - DEBUG - Final classification: unknown
+2024-12-25 20:35:38,301 - docflow.processor - INFO - Successfully processed document: tmpp1j8n5jv.pdf
+2024-12-25 20:36:13,311 - docflow.processor - DEBUG - Extracted text preview from test_invoice.txt: INVOICE #INV2024001
+
+Bill To:
+John Doe
+123 Main St
+San Francisco, CA 94105
+
+Date: 12/25/2024
+Due Date: 01/25/2025
+
+Description                     Amount
+--------------------------------
+Web Development Services      $1,500.00
+Hosting Services (Monthly)    $  150.00
+--------------------------------
+Total Amount:                $1,650.00
+
+Payment Terms: Net 30
+Please make checks payable to: DocFlow Solutions
+
+2024-12-25 20:36:13,312 - docflow.processor - DEBUG - Starting document classification
+2024-12-25 20:36:13,312 - docflow.processor - DEBUG - Document type 'invoice' matched 6 keywords
+2024-12-25 20:36:13,312 - docflow.processor - DEBUG - Document type 'contract' matched 1 keywords
+2024-12-25 20:36:13,312 - docflow.processor - DEBUG - Document type 'report' matched 0 keywords
+2024-12-25 20:36:13,312 - docflow.processor - DEBUG - Final classification: invoice
+2024-12-25 20:36:13,312 - docflow.processor - DEBUG - Attempting to extract metadata for type 'invoice'
+2024-12-25 20:36:13,312 - docflow.processor - DEBUG - Available fields: ['invoice_number', 'date', 'total_amount', 'due_date']
+2024-12-25 20:36:13,313 - docflow.processor - DEBUG - Using pattern for invoice_number: (?i)(?:invoice|bill)(?:\s+(?:no|number|#)?[:.\s]*)([\w-]+)
+2024-12-25 20:36:13,313 - docflow.processor - DEBUG - Field invoice_number: found
+2024-12-25 20:36:13,313 - docflow.processor - DEBUG - Using pattern for date: (?:\d{2}[-/]\d{2}[-/]\d{4})|(?:\w+\s+\d{1,2},?\s+\d{4})
+2024-12-25 20:36:13,313 - docflow.processor - DEBUG - Field date: found
+2024-12-25 20:36:13,314 - docflow.processor - DEBUG - Using pattern for total_amount: (?i)(?:total|amount|sum)[\s:]*[$€£]?\s*([\d,]+\.?\d*)
+2024-12-25 20:36:13,314 - docflow.processor - DEBUG - Field total_amount: found
+2024-12-25 20:36:13,314 - docflow.processor - DEBUG - Using pattern for due_date: (?i)due\s+(?:date|by)?[\s:]*(\d{2}[-/]\d{2}[-/]\d{4})
+2024-12-25 20:36:13,315 - docflow.processor - DEBUG - Field due_date: found
+2024-12-25 20:36:13,315 - docflow.processor - INFO - Successfully processed document: test_invoice.txt

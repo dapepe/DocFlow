@@ -5,7 +5,7 @@ formatters:
 handlers:
   console:
     class: logging.StreamHandler
-    level: INFO
+    level: DEBUG
     formatter: standard
     stream: ext://sys.stdout
   file:
@@ -15,6 +15,10 @@ handlers:
     filename: docflow.log
 loggers:
   docflow:
+    level: DEBUG
+    handlers: [console, file]
+    propagate: no
+  docflow.processor:
     level: DEBUG
     handlers: [console, file]
     propagate: no
