@@ -16,10 +16,22 @@ rules:
       - rechnungsnummer
       - belegnummer
     metadata_fields:
-      - invoice_number
-      - date
-      - total_amount
-      - due_date
+      invoice_number:
+        type: String
+        required: true
+        pattern: '(?i)(?:invoice|bill|rechnung|beleg)(?:\s*(?:no|number|nummer|#)?[:.\s]*)([\w-]+)'
+      date:
+        type: Date
+        required: true
+        pattern: '(?:\d{2}[-/.]\d{2}[-/.]\d{4})|(?:\w+\s+\d{1,2},?\s+\d{4})'
+      total_amount:
+        type: Float
+        required: true
+        pattern: '(?i)(?:total|amount|sum|betrag|summe|rechnungsbetrag)[\s:]*[$€£]?\s*([\d,.]+(?:[\.,]\d{2})?)'
+      due_date:
+        type: Date
+        required: false
+        pattern: '(?i)(?:due|fällig|zahlbar)\s+(?:date|bis|am)?[\s:]*(\d{2}[-/.]\d{2}[-/.]\d{4})'
 
   contract:
     keywords:
@@ -34,10 +46,22 @@ rules:
       - vereinbarung
       - bedingungen
     metadata_fields:
-      - contract_id
-      - parties
-      - effective_date
-      - expiration_date
+      contract_id:
+        type: String
+        required: true
+        pattern: '(?i)(?:contract|agreement|vertrag|vereinbarung)(?:\s*(?:no|number|nummer|#)?[:.\s]*)([\w-]+)'
+      parties:
+        type: String
+        required: true
+        pattern: '(?i)(?:between|parties|zwischen)[\s:]*(.+?)(?=\n|$)'
+      effective_date:
+        type: Date
+        required: true
+        pattern: '(?i)(?:effective|gültig\s+ab)\s+date[\s:]*(\d{2}[-/.]\d{2}[-/.]\d{4})'
+      expiration_date:
+        type: Date
+        required: false
+        pattern: '(?i)(?:expiration|termination|gültig\s+bis)\s+date[\s:]*(\d{2}[-/.]\d{2}[-/.]\d{4})'
 
   report:
     keywords:
@@ -52,16 +76,19 @@ rules:
       - analyse
       - zusammenfassung
     metadata_fields:
-      - report_type
-      - period
-      - author
-      - date
-
-extraction_patterns:
-  invoice_number: '(?i)(?:invoice|bill|rechnung|beleg)(?:\s*(?:no|number|nummer|#)?[:.\s]*)([\w-]+)'
-  date: '(?:\d{2}[-/.]\d{2}[-/.]\d{4})|(?:\w+\s+\d{1,2},?\s+\d{4})'
-  total_amount: '(?i)(?:total|amount|sum|betrag|summe|rechnungsbetrag)[\s:]*[$€£]?\s*([\d,.]+(?:[\.,]\d{2})?)'
-  due_date: '(?i)(?:due|fällig|zahlbar)\s+(?:date|bis|am)?[\s:]*(\d{2}[-/.]\d{2}[-/.]\d{4})'
-  contract_id: '(?i)(?:contract|agreement|vertrag|vereinbarung)(?:\s*(?:no|number|nummer|#)?[:.\s]*)([\w-]+)'
-  effective_date: '(?i)(?:effective|gültig\s+ab)\s+date[\s:]*(\d{2}[-/.]\d{2}[-/.]\d{4})'
-  expiration_date: '(?i)(?:expiration|termination|gültig\s+bis)\s+date[\s:]*(\d{2}[-/.]\d{2}[-/.]\d{4})'
+      report_type:
+        type: String
+        required: true
+        pattern: '(?i)(?:type|art)[\s:]*(\w+(?:\s+\w+)*)'
+      period:
+        type: String
+        required: false
+        pattern: '(?i)(?:period|zeitraum)[\s:]*(.+?)(?=\n|$)'
+      author:
+        type: String
+        required: true
+        pattern: '(?i)(?:author|prepared by|autor|erstellt von)[\s:]*(.+?)(?=\n|$)'
+      date:
+        type: Date
+        required: true
+        pattern: '(?:\d{2}[-/.]\d{2}[-/.]\d{4})|(?:\w+\s+\d{1,2},?\s+\d{4})'

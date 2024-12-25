@@ -281,3 +281,188 @@ Please make checks payable to: DocFlow Solutions
 2024-12-25 20:37:24,530 - docflow.processor - DEBUG - Using pattern for due_date: (?i)(?:due|fällig|zahlbar)\s+(?:date|bis|am)?[\s:]*(\d{2}[-/.]\d{2}[-/.]\d{4})
 2024-12-25 20:37:24,531 - docflow.processor - DEBUG - Field due_date: found
 2024-12-25 20:37:24,531 - docflow.processor - INFO - Successfully processed document: test_invoice.txt
+2024-12-25 20:37:41,234 - docflow.processor - DEBUG - Full PDF text extracted:
+Rechnung
+Belegdatum
+Kundennummer
+Belegnummer
+Seite15.02.2023
+22290
+202379890
+1ZeyOS GmbH & Co. KG
+Peter Haider
+Stepbergweg 5
+82491 Grainau
+Net-Build GmbH
+Alfred-Nobel-Allee 38
+66793 Saarwellingen
+Telefon: 06831 51677-0
+Telefax: 06831 51677-20
+E-Mail: info@netbuild.netKreissparkasse Saarlouis
+DE92 5935 0110 0370 0256 29
+KRSADE55XXX
+Deutsche Bank
+DE72 5907 0070 0606 1188 00
+DEUTDEDB595USt-Id Nummer
+DE 241550548
+Registernummer
+HR B 15070
+Registergericht
+Amtsgericht SaarbrückenGeschäftsführer
+Patrick Bohn
+Prokurist
+Maik Hausknecht
+Gerichtsstand
+SaarlouisPos. Beschreibung Referenz Zeitraum Preis
+eoffers.de1 5,30 EUR 15.01.2023 bis 14.01.2024
+pfuetsenpirat.de2 5,30 EUR 09.02.2023 bis 08.02.2024
+xn--pftsenpirat-uhb.de3 5,30 EUR 09.02.2023 bis 08.02.2024
+zeyconnect.com4 12,70 EUR 17.01.2023 bis 16.01.2024
+Sofern nicht anders angegeben entspricht das Rechnungsdatum dem Leistungsdatum.
+Der Rechnungsbetrag wird am 01.03.2023 per Lastschrift eingezogen.
+IBAN:DE8970040041021182****
+BIC:COBADEFFXXX
+Bank:Commerzbank MünchenRechnungsbetrag
+zzgl. 19% MwSt
+Rechnungsendbetrag28,60 EUR
+5,43 EUR
+34,03 EUR
+Net-Build GmbH
+Alfred-Nobel-Allee 38
+66793 Saarwellingen
+Telefon: 06831 51677-0
+Telefax: 06831 51677-20
+E-Mail: info@netbuild.netKreissparkasse Saarlouis
+DE92 5935 0110 0370 0256 29
+KRSADE55XXX
+Deutsche Bank
+DE72 5907 0070 0606 1188 00
+DEUTDEDB595USt-Id Nummer
+DE 241550548
+Registernummer
+HR B 15070
+Registergericht
+Amtsgericht SaarbrückenGeschäftsführer
+Patrick Bohn
+Prokurist
+Maik Hausknecht
+Gerichtsstand
+SaarlouisLeistungsübersicht
+Domains
+Pos. Beschreibung Referenz Fälligkeit Preis netto Intervall
+* Diese Leistung ist nicht kostenpflichtig (z.B. Inklusiv-Domain).
+Bitte überprüfen Sie stets alle aufgeführten Leistungen auf Ihre Richtigkeit hin, um eine fehlerhafte Berechnung zu vermeiden.1appstage.net 14.08.2023 14,90 EUR jährlich
+2cms-haider.com 10.09.2023 12,70 EUR jährlich
+3coutu.de 13.08.2023 5,30 EUR jährlich
+4crm.one 20.05.2023 10,04 EUR jährlich
+5dentadesk.com 18.04.2023 12,70 EUR jährlich
+6eoffers.de 15.01.2024 5,30 EUR jährlich
+7fusion-crm.com 30.04.2023 12,70 EUR jährlich
+8fusion-crm.de 30.04.2023 5,30 EUR jährlich
+9fusion-crm.net 30.04.2023 14,90 EUR jährlich
+10 fusioncrm.de 30.04.2023 5,30 EUR jährlich
+11 fusioncrm.net 30.04.2023 14,90 EUR jährlich
+12 inventorpark.com 10.09.2023 12,70 EUR jährlich
+13 inventorpark.de 03.09.2023 5,30 EUR jährlich
+14 katayo.com 15.10.2023 12,70 EUR jährlich
+15 katayo.de 15.10.2023 5,30 EUR jährlich
+16 katayo.net 15.10.2023 14,90 EUR jährlich
+17 kleine-markthalle.de 13.08.2023 5,30 EUR jährlich
+18 leadfire.de 02.06.2023 5,30 EUR jährlich
+19 lingolog.com 26.02.2023 12,70 EUR jährlich
+20 lingulog.com 04.12.2023 12,70 EUR jährlich
+21 mindlog.com 21.07.2023 12,70 EUR jährlich
+22 pfuetsenpirat.de 09.02.2024 5,30 EUR jährlich
+23 salesforce.one 20.05.2023 10,04 EUR jährlich
+24 spaceship.one 20.05.2023 10,04 EUR jährlich
+25 xn--pftsenpirat-uhb.de 09.02.2024 5,30 EUR jährlich
+26 zeyconnect.com 17.01.2024 12,70 EUR jährlich
+27 zeyflow.com 23.04.2023 12,70 EUR jährlich
+28 zeyon.de 17.07.2023 5,30 EUR jährlich
+29 zeyon.net 17.07.2023 14,90 EUR jährlich
+30 zeyos.com 13.11.2023 12,70 EUR jährlich
+31 zeyos.de 29.10.2023 5,30 EUR jährlich
+32 zeyos.net 24.10.2023 14,90 EUR jährlich
+33 zeystores.com 06.11.2023 12,70 EUR jährlich
+
+2024-12-25 20:37:41,240 - docflow.processor - DEBUG - Extracted text preview from tmp1jrtmnx_.pdf: Rechnung
+Belegdatum
+Kundennummer
+Belegnummer
+Seite15.02.2023
+22290
+202379890
+1ZeyOS GmbH & Co. KG
+Peter Haider
+Stepbergweg 5
+82491 Grainau
+Net-Build GmbH
+Alfred-Nobel-Allee 38
+66793 Saarwellingen
+Telefon: 06831 51677-0
+Telefax: 06831 51677-20
+E-Mail: info@netbuild.netKreissparkasse Saarlouis
+DE92 5935 0110 0370 0256 29
+KRSADE55XXX
+Deutsche Bank
+DE72 5907 0070 0606 1188 00
+DEUTDEDB595USt-Id Nummer
+DE 241550548
+Registernummer
+HR B 15070
+Registergericht
+Amtsgericht SaarbrückenGeschäftsführer
+Patric
+2024-12-25 20:37:41,243 - docflow.processor - DEBUG - Starting document classification
+2024-12-25 20:37:41,243 - docflow.processor - DEBUG - Document type 'invoice' matched 4 keywords
+2024-12-25 20:37:41,257 - docflow.processor - DEBUG - Document type 'contract' matched 0 keywords
+2024-12-25 20:37:41,258 - docflow.processor - DEBUG - Document type 'report' matched 0 keywords
+2024-12-25 20:37:41,260 - docflow.processor - DEBUG - Final classification: invoice
+2024-12-25 20:37:41,261 - docflow.processor - DEBUG - Attempting to extract metadata for type 'invoice'
+2024-12-25 20:37:41,262 - docflow.processor - DEBUG - Available fields: ['invoice_number', 'date', 'total_amount', 'due_date']
+2024-12-25 20:37:41,262 - docflow.processor - DEBUG - Using pattern for invoice_number: (?i)(?:invoice|bill|rechnung|beleg)(?:\s*(?:no|number|nummer|#)?[:.\s]*)([\w-]+)
+2024-12-25 20:37:41,264 - docflow.processor - DEBUG - Field invoice_number: found
+2024-12-25 20:37:41,264 - docflow.processor - DEBUG - Using pattern for date: (?:\d{2}[-/.]\d{2}[-/.]\d{4})|(?:\w+\s+\d{1,2},?\s+\d{4})
+2024-12-25 20:37:41,265 - docflow.processor - DEBUG - Field date: found
+2024-12-25 20:37:41,266 - docflow.processor - DEBUG - Using pattern for total_amount: (?i)(?:total|amount|sum|betrag|summe|rechnungsbetrag)[\s:]*[$€£]?\s*([\d,.]+(?:[\.,]\d{2})?)
+2024-12-25 20:37:41,269 - docflow.processor - DEBUG - Field total_amount: found
+2024-12-25 20:37:41,269 - docflow.processor - DEBUG - Using pattern for due_date: (?i)(?:due|fällig|zahlbar)\s+(?:date|bis|am)?[\s:]*(\d{2}[-/.]\d{2}[-/.]\d{4})
+2024-12-25 20:37:41,269 - docflow.processor - DEBUG - Field due_date: not found
+2024-12-25 20:37:41,270 - docflow.processor - INFO - Successfully processed document: tmp1jrtmnx_.pdf
+2024-12-25 20:46:46,273 - docflow.processor - DEBUG - Extracted text preview from test_invoice.txt: INVOICE #INV2024001
+
+Bill To:
+John Doe
+123 Main St
+San Francisco, CA 94105
+
+Date: 12/25/2024
+Due Date: 01/25/2025
+
+Description                     Amount
+--------------------------------
+Web Development Services      $1,500.00
+Hosting Services (Monthly)    $  150.00
+--------------------------------
+Total Amount:                $1,650.00
+
+Payment Terms: Net 30
+Please make checks payable to: DocFlow Solutions
+
+2024-12-25 20:46:46,274 - docflow.processor - DEBUG - Starting document classification
+2024-12-25 20:46:46,274 - docflow.processor - DEBUG - Document type 'invoice' matched 6 keywords
+2024-12-25 20:46:46,274 - docflow.processor - DEBUG - Document type 'contract' matched 1 keywords
+2024-12-25 20:46:46,274 - docflow.processor - DEBUG - Document type 'report' matched 0 keywords
+2024-12-25 20:46:46,275 - docflow.processor - DEBUG - Final classification: invoice
+2024-12-25 20:46:46,275 - docflow.processor - DEBUG - Attempting to extract metadata for type 'invoice'
+2024-12-25 20:46:46,275 - docflow.processor - DEBUG - Available fields: {'invoice_number': {'type': 'String', 'required': True, 'pattern': '(?i)(?:invoice|bill|rechnung|beleg)(?:\\s*(?:no|number|nummer|#)?[:.\\s]*)([\\w-]+)'}, 'date': {'type': 'Date', 'required': True, 'pattern': '(?:\\d{2}[-/.]\\d{2}[-/.]\\d{4})|(?:\\w+\\s+\\d{1,2},?\\s+\\d{4})'}, 'total_amount': {'type': 'Float', 'required': True, 'pattern': '(?i)(?:total|amount|sum|betrag|summe|rechnungsbetrag)[\\s:]*[$€£]?\\s*([\\d,.]+(?:[\\.,]\\d{2})?)'}, 'due_date': {'type': 'Date', 'required': False, 'pattern': '(?i)(?:due|fällig|zahlbar)\\s+(?:date|bis|am)?[\\s:]*(\\d{2}[-/.]\\d{2}[-/.]\\d{4})'}}
+2024-12-25 20:46:46,275 - docflow.processor - DEBUG - Using pattern for invoice_number: (?i)(?:invoice|bill|rechnung|beleg)(?:\s*(?:no|number|nummer|#)?[:.\s]*)([\w-]+)
+2024-12-25 20:46:46,275 - docflow.processor - DEBUG - Field invoice_number: found and converted to String
+2024-12-25 20:46:46,276 - docflow.processor - DEBUG - Using pattern for date: (?:\d{2}[-/.]\d{2}[-/.]\d{4})|(?:\w+\s+\d{1,2},?\s+\d{4})
+2024-12-25 20:46:46,278 - docflow.processor - DEBUG - Field date: found and converted to Date
+2024-12-25 20:46:46,278 - docflow.processor - DEBUG - Using pattern for total_amount: (?i)(?:total|amount|sum|betrag|summe|rechnungsbetrag)[\s:]*[$€£]?\s*([\d,.]+(?:[\.,]\d{2})?)
+2024-12-25 20:46:46,278 - docflow.processor - ERROR - Error parsing float 1,650.00: could not convert string to float: '1,650.00'
+2024-12-25 20:46:46,279 - docflow.processor - DEBUG - Field total_amount: found and converted to Float
+2024-12-25 20:46:46,279 - docflow.processor - DEBUG - Using pattern for due_date: (?i)(?:due|fällig|zahlbar)\s+(?:date|bis|am)?[\s:]*(\d{2}[-/.]\d{2}[-/.]\d{4})
+2024-12-25 20:46:46,281 - docflow.processor - DEBUG - Field due_date: found and converted to Date
+2024-12-25 20:46:46,281 - docflow.processor - INFO - Successfully processed document: test_invoice.txt

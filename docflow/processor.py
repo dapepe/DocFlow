@@ -1,12 +1,14 @@
 import yaml
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any, Union
 import logging
 import re
-from typing import BinaryIO, Union
+from typing import BinaryIO
 import docx
 from PyPDF2 import PdfReader
 import io
+from datetime import datetime
+import dateutil.parser
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +24,34 @@ class DocumentProcessor:
         except Exception as e:
             logger.error(f"Error loading rules file: {e}")
             return {}
+
+    def _parse_date(self, date_str: str) -> str:
+        """Parse date string to YYYY-MM-DD format"""
+        try:
+            # Parse the date string using dateutil
+            parsed_date = dateutil.parser.parse(date_str)
+            return parsed_date.strftime('%Y-%m-%d')
+        except Exception as e:
+            logger.error(f"Error parsing date {date_str}: {e}")
+            return date_str
+
+    def _parse_float(self, amount_str: str) -> float:
+        """Parse string amount to float, handling different number formats"""
+        try:
+            # Remove any currency symbols and whitespace
+            cleaned = re.sub(r'[^\d,.]', '', amount_str)
+
+            # Handle German number format (1.234,56 -> 1234.56)
+            if ',' in cleaned and '.' in cleaned:
+                if cleaned.rindex('.') < cleaned.rindex(','):
+                    cleaned = cleaned.replace('.', '').replace(',', '.')
+            elif ',' in cleaned and '.' not in cleaned:
+                cleaned = cleaned.replace(',', '.')
+
+            return float(cleaned)
+        except Exception as e:
+            logger.error(f"Error parsing float {amount_str}: {e}")
+            return 0.0
 
     def _extract_text_from_pdf(self, file_path: str) -> str:
         """Extract text from PDF file"""
@@ -75,38 +105,44 @@ class DocumentProcessor:
         logger.debug(f"Extracted text preview from {path.name}: {extracted_text[:500]}")
         return extracted_text
 
+    def _convert_value(self, value: str, field_type: str) -> Any:
+        """Convert extracted value to the specified type"""
+        if field_type == "Date":
+            return self._parse_date(value)
+        elif field_type == "Float":
+            return self._parse_float(value)
+        elif field_type == "Int":
+            return int(float(self._parse_float(value)))
+        else:  # String or unknown type
+            return value
+
     def _extract_metadata(self, text: str, doc_type: str) -> Dict:
         """Extract metadata using patterns from rules"""
         metadata = {}
-        patterns = self.rules.get('extraction_patterns', {})
-        fields = self.rules.get('rules', {}).get(doc_type, {}).get('metadata_fields', [])
+        fields = self.rules.get('rules', {}).get(doc_type, {}).get('metadata_fields', {})
 
         logger.debug(f"Attempting to extract metadata for type '{doc_type}'")
         logger.debug(f"Available fields: {fields}")
 
-        for field in fields:
-            if field in patterns:
-                pattern = patterns[field]
-                logger.debug(f"Using pattern for {field}: {pattern}")
-                matches = re.findall(pattern, text, re.MULTILINE | re.IGNORECASE)
-                if matches:
-                    if field == 'total_amount':
-                        # Handle both German (1.234,56) and English (1,234.56) number formats
-                        amount = matches[0][0] if isinstance(matches[0], tuple) else matches[0]
-                        # Remove any currency symbols and whitespace
-                        amount = re.sub(r'[^\d,.]', '', amount)
-                        # Convert German format to English if needed
-                        if ',' in amount and '.' in amount:
-                            if amount.rindex('.') < amount.rindex(','):
-                                # German format (1.234,56) -> English format (1234.56)
-                                amount = amount.replace('.', '').replace(',', '.')
-                        elif ',' in amount and '.' not in amount:
-                            # Assume German format with only comma
-                            amount = amount.replace(',', '.')
-                        metadata[field] = amount
-                    else:
-                        metadata[field] = matches[0]
-                logger.debug(f"Field {field}: {'found' if matches else 'not found'}")
+        required_fields = []
+        for field_name, field_config in fields.items():
+            if field_config.get('required', False):
+                required_fields.append(field_name)
+
+            pattern = field_config.get('pattern', '')
+            logger.debug(f"Using pattern for {field_name}: {pattern}")
+
+            matches = re.findall(pattern, text, re.MULTILINE | re.IGNORECASE)
+            if matches:
+                # Extract the first captured group or the entire match
+                value = matches[0][0] if isinstance(matches[0], tuple) else matches[0]
+                # Convert value to the specified type
+                field_type = field_config.get('type', 'String')
+                converted_value = self._convert_value(value, field_type)
+                metadata[field_name] = converted_value
+                logger.debug(f"Field {field_name}: found and converted to {field_type}")
+            elif field_name in required_fields:
+                logger.warning(f"Required field {field_name} not found in document")
 
         return metadata
 
