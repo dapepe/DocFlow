@@ -613,3 +613,40 @@ Patric
 2024-12-25 20:47:04,061 - docflow.processor - DEBUG - Field total_amount: found and converted to Float
 2024-12-25 20:47:04,061 - docflow.processor - DEBUG - Using pattern for due_date: (?i)(?:due|fällig|zahlbar)\s+(?:date|bis|am)?[\s:]*(\d{2}[-/.]\d{2}[-/.]\d{4})
 2024-12-25 20:47:04,062 - docflow.processor - INFO - Successfully processed document: tmpie210n3k.pdf
+2024-12-25 21:04:52,986 - docflow.processor - DEBUG - Extracted text preview from test_invoice.txt: INVOICE #INV2024001
+
+Bill To:
+John Doe
+123 Main St
+San Francisco, CA 94105
+
+Date: 12/25/2024
+Due Date: 01/25/2025
+
+Description                     Amount
+--------------------------------
+Web Development Services      $1,500.00
+Hosting Services (Monthly)    $  150.00
+--------------------------------
+Total Amount:                $1,650.00
+
+Payment Terms: Net 30
+Please make checks payable to: DocFlow Solutions
+
+2024-12-25 21:04:52,986 - docflow.processor - DEBUG - Starting document classification
+2024-12-25 21:04:52,986 - docflow.processor - DEBUG - Document type 'invoice' matched 6 keywords
+2024-12-25 21:04:52,986 - docflow.processor - DEBUG - Document type 'contract' matched 1 keywords
+2024-12-25 21:04:52,986 - docflow.processor - DEBUG - Document type 'report' matched 0 keywords
+2024-12-25 21:04:52,986 - docflow.processor - DEBUG - Final classification: invoice
+2024-12-25 21:04:52,986 - docflow.processor - DEBUG - Attempting to extract metadata for type 'invoice'
+2024-12-25 21:04:52,987 - docflow.processor - DEBUG - Available fields: {'invoice_number': {'type': 'String', 'required': True, 'pattern': '(?i)(?:invoice|bill|rechnung|beleg)(?:\\s*(?:no|number|nummer|#)?[:.\\s]*)([\\w-]+)'}, 'date': {'type': 'Date', 'required': True, 'pattern': '(?:\\d{2}[-/.]\\d{2}[-/.]\\d{4})|(?:\\w+\\s+\\d{1,2},?\\s+\\d{4})'}, 'total_amount': {'type': 'Float', 'required': True, 'pattern': '(?i)(?:total|amount|sum|betrag|summe|rechnungsbetrag)[\\s:]*[$€£]?\\s*([\\d,.]+(?:[\\.,]\\d{2})?)'}, 'due_date': {'type': 'Date', 'required': False, 'pattern': '(?i)(?:due|fällig|zahlbar)\\s+(?:date|bis|am)?[\\s:]*(\\d{2}[-/.]\\d{2}[-/.]\\d{4})'}}
+2024-12-25 21:04:52,987 - docflow.processor - DEBUG - Using pattern for invoice_number: (?i)(?:invoice|bill|rechnung|beleg)(?:\s*(?:no|number|nummer|#)?[:.\s]*)([\w-]+)
+2024-12-25 21:04:52,987 - docflow.processor - DEBUG - Field invoice_number: found and converted to String
+2024-12-25 21:04:52,987 - docflow.processor - DEBUG - Using pattern for date: (?:\d{2}[-/.]\d{2}[-/.]\d{4})|(?:\w+\s+\d{1,2},?\s+\d{4})
+2024-12-25 21:04:52,987 - docflow.processor - DEBUG - Field date: found and converted to Date
+2024-12-25 21:04:52,988 - docflow.processor - DEBUG - Using pattern for total_amount: (?i)(?:total|amount|sum|betrag|summe|rechnungsbetrag)[\s:]*[$€£]?\s*([\d,.]+(?:[\.,]\d{2})?)
+2024-12-25 21:04:52,988 - docflow.processor - ERROR - Error parsing float 1,650.00: could not convert string to float: '1,650.00'
+2024-12-25 21:04:52,988 - docflow.processor - DEBUG - Field total_amount: found and converted to Float
+2024-12-25 21:04:52,988 - docflow.processor - DEBUG - Using pattern for due_date: (?i)(?:due|fällig|zahlbar)\s+(?:date|bis|am)?[\s:]*(\d{2}[-/.]\d{2}[-/.]\d{4})
+2024-12-25 21:04:52,989 - docflow.processor - DEBUG - Field due_date: found and converted to Date
+2024-12-25 21:04:52,989 - docflow.processor - INFO - Successfully processed document: test_invoice.txt
