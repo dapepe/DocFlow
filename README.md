@@ -21,7 +21,15 @@ DocFlow is a powerful document processing tool that supports PDF, DOCX, and TXT 
 
 1. Fork this repl to your Replit account
 2. The project will automatically install dependencies
-3. Run the project using the "Run" button
+3. Click the "Run" button to start both:
+   - The API server (available on port 8000)
+   - The CLI demo processing a sample invoice
+
+The project is automatically configured to run in Replit's environment with:
+- Automatic dependency management
+- Parallel execution of API and CLI components
+- Port forwarding for the API server
+- Environment configuration via Replit's built-in tools
 
 ## Usage
 
