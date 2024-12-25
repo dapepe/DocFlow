@@ -1,0 +1,33 @@
+document_rules:
+  - name: invoice
+    keywords:
+      - invoice
+      - total amount
+      - bill to
+    metadata_fields:
+      - invoice_number
+      - date
+      - total_amount
+      - customer_name
+
+  - name: receipt
+    keywords:
+      - receipt
+      - payment
+      - total
+    metadata_fields:
+      - receipt_number
+      - date
+      - amount
+      - merchant
+
+  - name: contract
+    keywords:
+      - agreement
+      - contract
+      - terms
+    metadata_fields:
+      - contract_number
+      - start_date
+      - end_date
+      - parties
