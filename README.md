@@ -1,4 +1,3 @@
-
 # DocFlow Document Processor
 
 DocFlow is a powerful document processing tool that supports PDF, DOCX, and TXT files with features for metadata extraction, document classification, and OCR capabilities.
@@ -17,7 +16,31 @@ DocFlow is a powerful document processing tool that supports PDF, DOCX, and TXT 
 - Python 3.11+
 - Dependencies are listed in requirements.txt and will be installed automatically when you run the project
 
-## Getting Started on Replit
+## Getting started
+
+### Run locally with Python
+
+### Run with Docker
+
+Running with Docker:
+
+```bash
+docker build -t docflow .
+```
+
+Run the Docker Container
+
+```bash
+docker run -p 8000:8000 docflow
+```
+
+Run as service with Docker Compose:
+
+```bash
+docker-compose up
+```
+
+### Getting Started on Replit
 
 1. Fork this repl to your Replit account
 2. The project will automatically install dependencies
@@ -48,36 +71,3 @@ Example API endpoints:
 Process a single document:
 ```bash
 python main.py process path/to/document.pdf --ocr
-```
-
-Start the API server manually:
-```bash
-python main.py serve --port 8000
-```
-
-## Configuration
-
-- Document processing rules: `config/rules.yaml`
-- Logging configuration: `config/logging.yaml`
-
-## Project Structure
-
-```
-├── config/
-│   ├── default_rules.yaml   # Default processing rules
-│   ├── logging.yaml         # Logging configuration
-│   └── rules.yaml          # Custom processing rules
-├── docflow/                 # Main package
-│   ├── api.py              # FastAPI implementation
-│   ├── cli.py              # CLI implementation
-│   └── processor.py        # Document processing logic
-└── main.py                 # Entry point
-```
-
-## Example Document Processing
-
-```bash
-python main.py process test_invoice.txt
-```
-
-This will extract metadata and classify the document, displaying results in a formatted table.
