@@ -59,14 +59,19 @@ class DocumentProcessor:
         path = Path(file_path)
         suffix = path.suffix.lower()
 
+        extracted_text = ""
         if suffix == '.pdf':
-            return self._extract_text_from_pdf(file_path)
+            extracted_text = self._extract_text_from_pdf(file_path)
         elif suffix == '.docx':
-            return self._extract_text_from_docx(file_path)
+            extracted_text = self._extract_text_from_docx(file_path)
         elif suffix == '.txt':
-            return self._extract_text_from_txt(file_path)
+            extracted_text = self._extract_text_from_txt(file_path)
         else:
             raise ValueError(f"Unsupported file format: {suffix}")
+
+        # Log first 500 characters of extracted text for debugging
+        logger.debug(f"Extracted text preview from {path.name}: {extracted_text[:500]}")
+        return extracted_text
 
     def _extract_metadata(self, text: str, doc_type: str) -> Dict:
         metadata = {}
@@ -86,16 +91,22 @@ class DocumentProcessor:
         return metadata
 
     def _classify_document(self, text: str) -> str:
+        """Classify document based on content and rules"""
         max_matches = 0
         doc_type = "unknown"
+
+        # Log classification attempt
+        logger.debug("Starting document classification")
 
         for type_name, type_rules in self.rules.get('rules', {}).items():
             keywords = type_rules.get('keywords', [])
             matches = sum(1 for keyword in keywords if keyword.lower() in text.lower())
+            logger.debug(f"Document type '{type_name}' matched {matches} keywords")
             if matches > max_matches:
                 max_matches = matches
                 doc_type = type_name
 
+        logger.debug(f"Final classification: {doc_type}")
         return doc_type
 
     def process_document(self, file_path: str, use_ocr: bool = False) -> Dict:

@@ -8,3 +8,30 @@
 2024-12-25 20:32:56,726 - docflow.processor - ERROR - Error processing document /tmp/tmp4z8q7xmc: Unsupported file format: 
 2024-12-25 20:32:56,726 - docflow.api - ERROR - Error processing document: Unsupported file format: 
 2024-12-25 20:34:17,506 - docflow.processor - INFO - Successfully processed document: test_invoice.txt
+2024-12-25 20:34:38,507 - docflow.processor - INFO - Successfully processed document: tmpvzwjl9p5.pdf
+2024-12-25 20:35:20,458 - docflow.processor - DEBUG - Extracted text preview from test_invoice.txt: INVOICE #INV2024001
+
+Bill To:
+John Doe
+123 Main St
+San Francisco, CA 94105
+
+Date: 12/25/2024
+Due Date: 01/25/2025
+
+Description                     Amount
+--------------------------------
+Web Development Services      $1,500.00
+Hosting Services (Monthly)    $  150.00
+--------------------------------
+Total Amount:                $1,650.00
+
+Payment Terms: Net 30
+Please make checks payable to: DocFlow Solutions
+
+2024-12-25 20:35:20,459 - docflow.processor - DEBUG - Starting document classification
+2024-12-25 20:35:20,459 - docflow.processor - DEBUG - Document type 'invoice' matched 6 keywords
+2024-12-25 20:35:20,459 - docflow.processor - DEBUG - Document type 'contract' matched 1 keywords
+2024-12-25 20:35:20,459 - docflow.processor - DEBUG - Document type 'report' matched 0 keywords
+2024-12-25 20:35:20,459 - docflow.processor - DEBUG - Final classification: invoice
+2024-12-25 20:35:20,460 - docflow.processor - INFO - Successfully processed document: test_invoice.txt
