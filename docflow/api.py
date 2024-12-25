@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import tempfile
 import os
+from pathlib import Path
 from .processor import DocumentProcessor
 import logging
 
@@ -73,8 +74,16 @@ async def process_document(
     - text_length: Length of the extracted text
     """
     try:
-        # Create temporary file
-        with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+        # Get original file extension
+        original_extension = Path(file.filename).suffix.lower()
+        if original_extension not in processor.supported_formats:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file format: {original_extension}. Supported formats: {', '.join(processor.supported_formats)}"
+            )
+
+        # Create temporary file with correct extension
+        with tempfile.NamedTemporaryFile(suffix=original_extension, delete=False) as temp_file:
             content = await file.read()
             temp_file.write(content)
             temp_path = temp_file.name
