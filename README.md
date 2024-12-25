@@ -15,17 +15,7 @@ DocFlow is a powerful document processing tool that supports PDF, DOCX, and TXT 
 ## Requirements
 
 - Python 3.11+
-- Dependencies listed in pyproject.toml:
-  - click
-  - docling
-  - fastapi
-  - pypdf2
-  - python-dateutil
-  - python-docx
-  - python-multipart
-  - pyyaml
-  - rich
-  - uvicorn
+- Dependencies are listed in requirements.txt and will be installed automatically when you run the project
 
 ## Getting Started on Replit
 
