@@ -13,3 +13,4 @@ google-generativeai
 openai
 ollama
 twilio
+openai
