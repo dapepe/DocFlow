@@ -105,7 +105,7 @@ class GPT4VisionModel(BaseAIModel):
     """Integration with OpenAI's GPT-4 Vision API"""
 
     def __init__(self):
-        self.model_name = "gpt-4-vision-preview"
+        self.model_name = "gpt-4-vision"  
         self._init_client()
 
     @classmethod
