@@ -6,6 +6,9 @@ import logging
 from pathlib import Path
 import base64
 import os
+import pdf2image  # For converting PDF pages to images
+from PIL import Image
+import io
 
 logger = logging.getLogger(__name__)
 
@@ -115,7 +118,7 @@ class LlamaVisionModel(BaseAIModel):
 class GPT4VisionModel(BaseAIModel):
     """Integration with OpenAI's GPT-4 Vision API"""
 
-    def __init__(self, model_name: str = "gpt-4o-mini"):
+    def __init__(self, model_name: str = "gpt-4"):
         self.model_name = model_name
         self._init_client()
 
@@ -133,13 +136,34 @@ class GPT4VisionModel(BaseAIModel):
             logger.error(f"Error initializing OpenAI client: {e}")
             raise
 
-    def _encode_image_for_openai(self, image_path: str) -> str:
-        """Convert image to base64 for OpenAI API"""
+    def _convert_pdf_to_image(self, pdf_path: str) -> bytes:
+        """Convert first page of PDF to PNG image"""
         try:
-            with open(image_path, "rb") as image_file:
-                return base64.b64encode(image_file.read()).decode('utf-8')
+            # Convert first page of PDF to PIL Image
+            images = pdf2image.convert_from_path(pdf_path, first_page=1, last_page=1)
+            if not images:
+                raise ValueError("Failed to convert PDF to image")
+
+            # Convert PIL Image to PNG bytes
+            img_byte_arr = io.BytesIO()
+            images[0].save(img_byte_arr, format='PNG')
+            img_byte_arr.seek(0)
+            return img_byte_arr.getvalue()
         except Exception as e:
-            logger.error(f"Error encoding image for OpenAI: {e}")
+            logger.error(f"Error converting PDF to image: {e}")
+            raise
+
+    def _encode_image(self, image_path: str) -> str:
+        """Encode image to base64, converting PDF if necessary"""
+        try:
+            if Path(image_path).suffix.lower() == '.pdf':
+                image_bytes = self._convert_pdf_to_image(image_path)
+                return base64.b64encode(image_bytes).decode('utf-8')
+            else:
+                with open(image_path, 'rb') as img_file:
+                    return base64.b64encode(img_file.read()).decode('utf-8')
+        except Exception as e:
+            logger.error(f"Error encoding image: {e}")
             raise
 
     def extract_information(self, text: str, image_path: Optional[str] = None) -> Dict[str, Any]:
@@ -166,11 +190,11 @@ Please extract:
 
             # Add image if provided
             if image_path and Path(image_path).exists():
-                base64_image = self._encode_image_for_openai(image_path)
+                base64_image = self._encode_image(image_path)
                 content.append({
                     "type": "image_url",
                     "image_url": {
-                        "url": f"data:image/jpeg;base64,{base64_image}"
+                        "url": f"data:image/png;base64,{base64_image}"
                     }
                 })
 
