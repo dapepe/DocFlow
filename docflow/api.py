@@ -54,7 +54,8 @@ async def root():
 async def process_document(
     file: UploadFile = File(..., description="The document file (PDF, DOCX, or TXT)"),
     use_ocr: bool = Form(False, alias="use-ocr", description="Whether to use OCR for processing"),
-    include_text: bool = Form(False, alias="include-text", description="Whether to include extracted text in the response")
+    include_text: bool = Form(False, alias="include-text", description="Whether to include extracted text in the response"),
+    model: str = Form("llama-vision", description="AI model to use (llama-vision, gpt4-vision, gemini, or fallback)")
 ):
     """
     Process a document and extract metadata.
@@ -64,6 +65,7 @@ async def process_document(
     * Metadata extraction
     * OCR processing (optional)
     * Full text extraction (optional)
+    * Multiple AI model support
 
     **Supported File Types:**
     * PDF
@@ -91,7 +93,9 @@ async def process_document(
             temp_path = temp_file.name
 
         try:
-            result = processor.process_document(temp_path, use_ocr)
+            # Initialize processor with selected model
+            processor_instance = DocumentProcessor(ai_model=model)
+            result = processor_instance.process_document(temp_path, use_ocr)
 
             # Remove text_content if not requested
             if not include_text and 'text_content' in result:

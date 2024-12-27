@@ -20,12 +20,13 @@ def cli():
 @click.option('--use-ocr', is_flag=True, help="Enable OCR processing")
 @click.option('--output', '-o', type=click.Path(), help="Output file path for JSON results")
 @click.option('--model', '-m', 
-              type=click.Choice(['gpt4-vision', 'gemini', 'llama-vision']), 
+              type=click.Choice(['llama-vision', 'gpt4-vision', 'gemini', 'fallback']),
+              default='llama-vision',
               help="Choose AI model for analysis")
 @click.option('--include-text', is_flag=True, help="Display the extracted text content")
 @click.option('--save-text', type=click.Path(), help="Save extracted text to a separate file")
 def process(file_path: str, use_ocr: bool, output: str, model: str, include_text: bool, save_text: str):
-    """Process a single document"""
+    """Process a single document with optional AI model selection"""
     try:
         processor = DocumentProcessor(ai_model=model)
         result = processor.process_document(file_path, use_ocr=use_ocr)

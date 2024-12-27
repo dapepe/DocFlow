@@ -27,21 +27,28 @@ class DocumentProcessor:
 
     def _initialize_ai_model(self, model_name: Optional[str]) -> BaseAIModel:
         """Initialize the specified AI model with fallback options"""
+        logger.debug(f"Initializing AI model: {model_name}")
         try:
             if model_name == "llama-vision":
                 return LlamaVisionModel()
+            elif model_name == "gpt4-vision":
+                return GPT4VisionModel()
+            elif model_name == "gemini":
+                return GeminiModel()
+            elif model_name == "fallback":
+                return FallbackModel()
             elif model_name is None:
-                # Default to Llama Vision
+                # Default to Llama Vision with fallback
                 try:
                     return LlamaVisionModel()
                 except Exception as e:
-                    logger.warning(f"Failed to initialize Llama Vision: {e}")
+                    logger.warning(f"Failed to initialize Llama Vision: {e}, using fallback")
                     return FallbackModel()
             else:
                 logger.warning(f"Unknown model {model_name}, using fallback")
                 return FallbackModel()
         except Exception as e:
-            logger.error(f"Error initializing AI model: {e}, using fallback")
+            logger.error(f"Error initializing AI model {model_name}: {e}")
             return FallbackModel()
 
     def _load_rules(self, rules_file: str) -> Dict:
@@ -157,32 +164,27 @@ class DocumentProcessor:
         logger.debug(f"Attempting to extract metadata for type '{doc_type}'")
         logger.debug(f"Available fields: {fields}")
 
-        required_fields = []
         for field_name, field_config in fields.items():
-            if field_config.get('required', False):
-                required_fields.append(field_name)
-
             pattern = field_config.get('pattern', '')
             if field_name == 'total_amount':
                 pattern = r'(?i)(?:total\s+net|amount\s+due|total|amount|sum|betrag|summe|rechnungsbetrag)[\s:]*[$€£]?\s*([\d.,]+(?:[\.,]\d{2})?)\s*[$€£]?'
             elif field_name == 'date':
-                # Updated pattern to be more specific for invoice dates
                 pattern = r'(?i)(?:invoice\s+date|date|datum|belegdatum)[\s:]*(\d{1,2}[-/\.]\d{1,2}[-/\.]\d{4})'
             elif field_name == 'invoice_number':
-                pattern = r'(?i)(?:invoice\s*(?:no|number|#|:|\.)|bill\s*(?:no|number|#|:|\.)|rechnung\s*(?:nr|nummer|#|:|\.)|beleg\s*(?:nr|nummer|#|:|\.))[\s:]*([A-Za-z0-9][-A-Za-z0-9/]*[A-Za-z0-9])'
+                # Updated pattern to handle various invoice number formats including GC-2024/12/01
+                pattern = r'(?i)Invoice\s+No\.?:\s*((?:[A-Za-z]{1,4}[-]?\d{4}[-/]\d{1,2}[-/]\d{1,2})|(?:[A-Za-z0-9][-A-Za-z0-9/]*[A-Za-z0-9]))'
 
             logger.debug(f"Using pattern for {field_name}: {pattern}")
 
             matches = re.findall(pattern, text, re.MULTILINE | re.IGNORECASE)
             if matches:
-                # Extract the first captured group or the entire match
-                value = matches[0][0] if isinstance(matches[0], tuple) else matches[0]
+                value = matches[0]
+                if isinstance(value, tuple):
+                    value = value[0]
                 try:
-                    # Convert value to the specified type
                     field_type = field_config.get('type', 'String')
                     converted_value = self._convert_value(value, field_type)
                     if field_type == 'Date' and converted_value == value:
-                        # If date parsing failed (returned original string), skip this match
                         logger.warning(f"Failed to parse date value: {value}")
                         continue
                     metadata[field_name] = converted_value
@@ -190,8 +192,6 @@ class DocumentProcessor:
                 except Exception as e:
                     logger.error(f"Error converting field {field_name}: {e}")
                     continue
-            elif field_name in required_fields:
-                logger.warning(f"Required field {field_name} not found in document")
 
         return metadata
 
