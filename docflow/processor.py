@@ -224,6 +224,7 @@ class DocumentProcessor:
                 "document_type": doc_type,
                 "metadata": metadata,
                 "text_length": len(text),
+                "text_content": text,
                 "ai_analysis": ai_analysis
             }
 

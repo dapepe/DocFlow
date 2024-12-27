@@ -22,7 +22,9 @@ def cli():
 @click.option('--model', '-m', 
               type=click.Choice(['gpt4-vision', 'gemini', 'llama-vision']), 
               help="Choose AI model for analysis")
-def process(file_path: str, ocr: bool, output: str, model: str):
+@click.option('--show-text', is_flag=True, help="Display the extracted text content")
+@click.option('--save-text', type=click.Path(), help="Save extracted text to a separate file")
+def process(file_path: str, ocr: bool, output: str, model: str, show_text: bool, save_text: str):
     """Process a single document"""
     try:
         processor = DocumentProcessor(ai_model=model)
@@ -55,6 +57,16 @@ def process(file_path: str, ocr: bool, output: str, model: str):
                 table.add_row("AI Analysis", analysis_preview)
 
         console.print(table)
+
+        # Handle text content display/save options
+        if show_text:
+            console.print("\nExtracted Text Content:", style="blue")
+            console.print(result['text_content'])
+
+        if save_text:
+            with open(save_text, 'w', encoding='utf-8') as f:
+                f.write(result['text_content'])
+            console.print(f"\nText content saved to: {save_text}", style="blue")
 
         if output:
             import json

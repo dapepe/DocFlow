@@ -15,3 +15,4 @@ ollama
 twilio
 openai
 pdf2image
+trafilatura
