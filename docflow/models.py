@@ -118,8 +118,8 @@ class LlamaVisionModel(BaseAIModel):
 class GPT4VisionModel(BaseAIModel):
     """Integration with OpenAI's GPT-4 Vision API"""
 
-    def __init__(self, model_name: str = "gpt-4"):
-        self.model_name = model_name
+    def __init__(self):
+        self.model_name = "gpt-4-vision-preview"
         self._init_client()
 
     def _init_client(self):
@@ -172,10 +172,19 @@ class GPT4VisionModel(BaseAIModel):
             if not hasattr(self, 'client'):
                 raise ValueError("OpenAI client not initialized")
 
-            # Construct the message content
-            content = [{
-                "type": "text",
-                "text": f"""Analyze this document and extract key information.
+            # Prepare system message and user query
+            messages = [{
+                "role": "system",
+                "content": "You are a document analysis expert. Extract key information from documents and images."
+            }]
+
+            # Add text content
+            user_message = {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"""Analyze this document and extract key information.
 
 Text content:
 {text}
@@ -186,24 +195,28 @@ Please extract:
 3. Important numbers/amounts
 4. Names and entities
 5. Key points or summary"""
-            }]
+                    }
+                ]
+            }
 
             # Add image if provided
             if image_path and Path(image_path).exists():
                 base64_image = self._encode_image(image_path)
-                content.append({
-                    "type": "image_url",
+                user_message["content"].append({
+                    "type": "image",
                     "image_url": {
                         "url": f"data:image/png;base64,{base64_image}"
                     }
                 })
 
+            messages.append(user_message)
+
+            logger.debug(f"Using model: {self.model_name}")
+            logger.debug(f"Message structure: {messages}")
+
             response = self.client.chat.completions.create(
                 model=self.model_name,
-                messages=[{
-                    "role": "user",
-                    "content": content
-                }],
+                messages=messages,
                 max_tokens=1000
             )
 
