@@ -362,7 +362,7 @@ class FallbackModel(BaseAIModel):
 def get_available_models() -> Dict[str, str]:
     """Return a dictionary of available models and their descriptions"""
     models = {
-        "llava": "LLaVA via Ollama (requires Ollama installation)",
+        "llava": "LLaVA via Ollama (requires Ollama installation: https://ollama.ai)",
         "llama-vision": "Llama 3.2 Vision via Ollama (requires Ollama installation)",
         "gpt4-vision": "OpenAI's GPT-4 Vision API (requires OPENAI_API_KEY)",
         "gemini": "Google's Gemini Pro Vision (requires GOOGLE_API_KEY)",
@@ -374,9 +374,6 @@ def get_available_models() -> Dict[str, str]:
     for model_id, description in models.items():
         try:
             if model_id in ["llava", "llama-vision"]:
-                # Try to initialize with specific model variant
-                variant = "llava" if model_id == "llava" else "llama-3.2-vision"
-                LlamaVisionModel(model_variant=variant)._check_availability()
                 available[model_id] = description
             elif model_id == "gpt4-vision" and GPT4VisionModel.validate_environment():
                 available[model_id] = description
@@ -386,6 +383,8 @@ def get_available_models() -> Dict[str, str]:
                 available[model_id] = description
         except Exception as e:
             logger.debug(f"Model {model_id} not available: {e}")
+            if model_id in ["llava", "llama-vision"]:
+                available[model_id] = description  # Still show Ollama models even if service is not running
             continue
 
     return available
