@@ -72,19 +72,18 @@ async def get_available_models():
     tags=["Document Processing"])
 async def process_document(
     file: UploadFile = File(..., description="The document file (PDF, DOCX, or TXT)"),
-    use_ocr: bool = Form(False, alias="use-ocr", description="Whether to use OCR for processing"),
-    include_text: bool = Form(False, alias="include-text", description="Whether to include extracted text in the response"),
+    use_ocr: bool = Form(False, alias="use-ocr", description="Enable OCR processing for documents"),
+    include_text: bool = Form(False, alias="include-text", description="Include extracted text in response"),
     model: AIModel = Form(AIModel.LLAVA, description="AI model to use for analysis")
 ):
     """
     Process a document and extract metadata.
 
-    **Features:**
-    * Document classification
-    * Metadata extraction
-    * OCR processing (optional)
-    * Full text extraction (optional)
-    * Multiple AI model support
+    **Parameters:**
+    * file: The document file to process (PDF, DOCX, or TXT)
+    * use-ocr: Enable OCR processing for documents (default: false)
+    * include-text: Include extracted text in response (default: false)
+    * model: AI model to use for analysis (default: llava)
 
     **Supported File Types:**
     * PDF
@@ -92,16 +91,16 @@ async def process_document(
     * TXT
 
     **Available Models:**
-    * llava (default) - LLaVA via Ollama
-    * llama-vision - Llama 3.2 Vision via Ollama
-    * gpt4-vision - OpenAI's GPT-4 Vision
-    * gemini - Google's Gemini Pro Vision
-    * fallback - Basic text analysis
+    * llava (default) - LLaVA via Ollama (requires installation)
+    * llama-vision - Llama 3.2 Vision via Ollama (requires installation)
+    * gpt4-vision - OpenAI's GPT-4 Vision API (requires OPENAI_API_KEY)
+    * gemini - Google's Gemini Pro Vision (requires GOOGLE_API_KEY)
+    * fallback - Basic text analysis without AI
 
     **Returns:**
     - document_type: The classified type of the document
     - metadata: Extracted metadata fields
-    - text_content: Full extracted text (if include-text is True)
+    - text_content: Full extracted text (if include-text is true)
     - ai_analysis: AI model analysis results
     """
     try:
