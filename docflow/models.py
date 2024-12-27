@@ -115,7 +115,7 @@ class LlamaVisionModel(BaseAIModel):
 class GPT4VisionModel(BaseAIModel):
     """Integration with OpenAI's GPT-4 Vision API"""
 
-    def __init__(self, model_name: str = "gpt4"):
+    def __init__(self, model_name: str = "gpt-4o-mini"):
         self.model_name = model_name
         self._init_client()
 
