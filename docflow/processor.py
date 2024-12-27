@@ -39,8 +39,10 @@ class DocumentProcessor:
                 logger.warning(f"Requested model '{model_name}' not available")
                 model_name = None
 
-            if model_name == "llama-vision" or (model_name is None and "llama-vision" in self.available_models):
-                return LlamaVisionModel()
+            if model_name in ["llava", "llama-vision"]:
+                # Use appropriate variant based on model name
+                variant = "llava" if model_name == "llava" else "llama-3.2-vision"
+                return LlamaVisionModel(model_variant=variant)
             elif model_name == "gpt4-vision" and "gpt4-vision" in self.available_models:
                 return GPT4VisionModel()
             elif model_name == "gemini" and "gemini" in self.available_models:

@@ -31,24 +31,27 @@ class BaseAIModel(ABC):
         return True
 
 class LlamaVisionModel(BaseAIModel):
-    """Integration with Ollama via HTTP API for LLaVA model"""
+    """Integration with Ollama via HTTP API for LLaVA/Llama models"""
 
-    def __init__(self):
-        self.model_name = "llava"  # Using LLaVA model instead of llama
+    def __init__(self, model_variant="llava"):
+        # Allow selecting between llava and llama-3.2-vision
+        self.model_variant = model_variant
+        self.model_name = "llava" if model_variant == "llava" else "llama-3.2-vision"
         self.base_url = os.getenv("OLLAMA_HOST", "http://localhost:11434")
         self._check_availability()
 
     def _check_availability(self):
-        """Check if Ollama service is available"""
+        """Check if Ollama service and selected model is available"""
         try:
             response = requests.get(f"{self.base_url}/api/tags")
             if response.status_code != 200:
                 raise ModelNotAvailableError("Ollama service not available")
 
-            # Check if llava model is available
+            # Check if selected model is available
             models = response.json().get('models', [])
-            if not any(m.get('name', '').startswith('llava') for m in models):
-                raise ModelNotAvailableError("LLaVA model not found in Ollama")
+            model_exists = any(m.get('name', '').startswith(self.model_name) for m in models)
+            if not model_exists:
+                raise ModelNotAvailableError(f"{self.model_name} model not found in Ollama")
 
             logger.debug(f"Available Ollama models: {response.json()}")
         except Exception as e:
@@ -340,7 +343,8 @@ class FallbackModel(BaseAIModel):
 def get_available_models() -> Dict[str, str]:
     """Return a dictionary of available models and their descriptions"""
     models = {
-        "llama-vision": "LLaVA Vision via Ollama (local AI model)",
+        "llava": "LLaVA via Ollama (local AI model)",
+        "llama-vision": "Llama 3.2 Vision via Ollama (local AI model)",
         "gpt4-vision": "OpenAI's GPT-4 Vision API",
         "gemini": "Google's Gemini Pro Vision",
         "fallback": "Basic text analysis without AI"
@@ -350,8 +354,10 @@ def get_available_models() -> Dict[str, str]:
     available = {}
     for model_id, description in models.items():
         try:
-            if model_id == "llama-vision":
-                LlamaVisionModel()._check_availability()
+            if model_id in ["llava", "llama-vision"]:
+                # Try to initialize with specific model variant
+                variant = "llava" if model_id == "llava" else "llama-3.2-vision"
+                LlamaVisionModel(model_variant=variant)._check_availability()
                 available[model_id] = description
             elif model_id == "gpt4-vision" and GPT4VisionModel.validate_environment():
                 available[model_id] = description
