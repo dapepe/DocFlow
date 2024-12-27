@@ -1,6 +1,7 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from enum import Enum
 import tempfile
 import os
 from pathlib import Path
@@ -17,6 +18,7 @@ app = FastAPI(
     * Metadata extraction
     * Document classification
     * OCR capabilities
+    * Multiple AI model support
     """,
     version="1.0.0",
     docs_url="/docs",
@@ -31,7 +33,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Create a base processor to get available models
 processor = DocumentProcessor()
+
+class AIModel(str, Enum):
+    """Enum for available AI models"""
+    LLAMA = "llama-vision"
+    GPT4 = "gpt4-vision"
+    GEMINI = "gemini"
+    FALLBACK = "fallback"
 
 @app.get("/")
 async def root():
@@ -43,11 +53,19 @@ async def root():
         "version": "1.0.0",
         "endpoints": {
             "documentation": "/docs",
-            "process": "/process"
+            "process": "/process",
+            "models": "/models"
         }
     }
 
-@app.post("/process", 
+@app.get("/models")
+async def get_available_models():
+    """
+    Get list of available AI models
+    """
+    return {"models": processor.get_supported_models()}
+
+@app.post("/process",
     summary="Process a document",
     response_description="Document metadata and classification results",
     tags=["Document Processing"])
@@ -55,7 +73,7 @@ async def process_document(
     file: UploadFile = File(..., description="The document file (PDF, DOCX, or TXT)"),
     use_ocr: bool = Form(False, alias="use-ocr", description="Whether to use OCR for processing"),
     include_text: bool = Form(False, alias="include-text", description="Whether to include extracted text in the response"),
-    model: str = Form("llama-vision", description="AI model to use (llama-vision, gpt4-vision, gemini, or fallback)")
+    model: AIModel = Form(AIModel.LLAMA, description="AI model to use for analysis")
 ):
     """
     Process a document and extract metadata.
@@ -72,10 +90,17 @@ async def process_document(
     * DOCX
     * TXT
 
+    **Available Models:**
+    * llama-vision (default) - Llama Vision via Ollama
+    * gpt4-vision - OpenAI's GPT-4 Vision
+    * gemini - Google's Gemini Pro Vision
+    * fallback - Basic text analysis
+
     **Returns:**
     - document_type: The classified type of the document
     - metadata: Extracted metadata fields
     - text_content: Full extracted text (if include-text is True)
+    - ai_analysis: AI model analysis results
     """
     try:
         # Get original file extension
@@ -94,7 +119,7 @@ async def process_document(
 
         try:
             # Initialize processor with selected model
-            processor_instance = DocumentProcessor(ai_model=model)
+            processor_instance = DocumentProcessor(ai_model=model.value)
             result = processor_instance.process_document(temp_path, use_ocr)
 
             # Remove text_content if not requested

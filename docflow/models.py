@@ -1,3 +1,4 @@
+"""AI model integrations for document processing"""
 import json
 import requests
 from abc import ABC, abstractmethod
@@ -6,11 +7,15 @@ import logging
 from pathlib import Path
 import base64
 import os
-import pdf2image  # For converting PDF pages to images
+import pdf2image
 from PIL import Image
 import io
 
 logger = logging.getLogger(__name__)
+
+class ModelNotAvailableError(Exception):
+    """Raised when a model is not available due to missing dependencies or API keys"""
+    pass
 
 class BaseAIModel(ABC):
     """Base class for AI model integrations"""
@@ -19,6 +24,11 @@ class BaseAIModel(ABC):
     def extract_information(self, text: str, image_path: Optional[str] = None) -> Dict[str, Any]:
         """Extract information from text and optionally an image"""
         pass
+
+    @classmethod
+    def validate_environment(cls) -> bool:
+        """Validate that all required environment variables are present"""
+        return True
 
 class LlamaVisionModel(BaseAIModel):
     """Integration with Ollama via HTTP API"""
@@ -33,46 +43,14 @@ class LlamaVisionModel(BaseAIModel):
         try:
             response = requests.get(f"{self.base_url}/api/tags")
             if response.status_code != 200:
-                raise ConnectionError("Ollama service not available")
+                raise ModelNotAvailableError("Ollama service not available")
             logger.debug(f"Available Ollama models: {response.json()}")
         except Exception as e:
             logger.error(f"Error checking Ollama availability: {e}")
-            raise
-
-    def _convert_pdf_to_image(self, pdf_path: str) -> bytes:
-        """Convert first page of PDF to PNG image"""
-        try:
-            # Convert first page of PDF to PIL Image
-            images = pdf2image.convert_from_path(pdf_path, first_page=1, last_page=1)
-            if not images:
-                raise ValueError("Failed to convert PDF to image")
-
-            # Convert PIL Image to PNG bytes
-            img_byte_arr = io.BytesIO()
-            images[0].save(img_byte_arr, format='PNG')
-            img_byte_arr.seek(0)
-            return img_byte_arr.getvalue()
-        except Exception as e:
-            logger.error(f"Error converting PDF to image: {e}")
-            raise
-
-    def _encode_image(self, image_path: str) -> str:
-        """Encode image to base64, converting PDF if necessary"""
-        try:
-            if Path(image_path).suffix.lower() == '.pdf':
-                image_bytes = self._convert_pdf_to_image(image_path)
-                return base64.b64encode(image_bytes).decode('utf-8')
-            else:
-                with open(image_path, 'rb') as img_file:
-                    return base64.b64encode(img_file.read()).decode('utf-8')
-        except Exception as e:
-            logger.error(f"Error encoding image: {e}")
-            raise
+            raise ModelNotAvailableError(f"Ollama service error: {e}")
 
     def extract_information(self, text: str, image_path: Optional[str] = None) -> Dict[str, Any]:
-        """Extract information using Llama Vision through Ollama API"""
         try:
-            # Prepare the prompt
             prompt = f"""Analyze this document and extract key information.
 
             Text content:
@@ -83,28 +61,23 @@ class LlamaVisionModel(BaseAIModel):
             2. dates: List of important dates found
             3. amounts: List of monetary amounts found
             4. entities: List of names and organizations
-            5. summary: Brief summary of key points
+            5. key_fields: Map of key fields like invoice numbers, reference numbers, etc.
             """
 
-            # Prepare the API request
             payload = {
                 "model": self.model_name,
                 "prompt": prompt,
                 "stream": False,
                 "options": {
-                    "temperature": 0.2,
-                    "top_p": 0.9,
-                    "num_predict": 1000
+                    "temperature": 0.2
                 }
             }
 
-            # If image is provided, add it to the payload
             if image_path and Path(image_path).exists():
-                payload["images"] = [self._encode_image(image_path)]
-                logger.debug("Added image to Ollama request")
+                with open(image_path, 'rb') as img_file:
+                    img_data = base64.b64encode(img_file.read()).decode('utf-8')
+                    payload["images"] = [img_data]
 
-            # Make API request
-            logger.debug(f"Sending request to Ollama API: {self.base_url}/api/generate")
             response = requests.post(
                 f"{self.base_url}/api/generate",
                 json=payload,
@@ -114,22 +87,12 @@ class LlamaVisionModel(BaseAIModel):
             if response.status_code != 200:
                 raise Exception(f"Ollama API error: {response.text}")
 
-            result = response.json()
-            logger.debug(f"Ollama API response: {result}")
-
             return {
-                "raw_analysis": result.get("response", ""),
+                "raw_analysis": response.json().get("response", ""),
                 "model_name": self.model_name,
                 "success": True
             }
 
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error connecting to Ollama service: {e}")
-            return {
-                "success": False,
-                "error": "Ollama service unavailable",
-                "model_name": self.model_name
-            }
         except Exception as e:
             logger.error(f"Error in Llama Vision extraction: {e}")
             return {
@@ -145,117 +108,76 @@ class GPT4VisionModel(BaseAIModel):
         self.model_name = "gpt-4-vision-preview"
         self._init_client()
 
+    @classmethod
+    def validate_environment(cls) -> bool:
+        """Check if OpenAI API key is available"""
+        return bool(os.getenv("OPENAI_API_KEY"))
+
     def _init_client(self):
         """Initialize OpenAI client"""
         try:
+            if not self.validate_environment():
+                raise ModelNotAvailableError("OPENAI_API_KEY environment variable not set")
+
             from openai import OpenAI
-            api_key = os.getenv("OPENAI_API_KEY")
-            if not api_key:
-                raise ValueError("OPENAI_API_KEY environment variable not set")
-            self.client = OpenAI(api_key=api_key)
+            self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            logger.info("OpenAI client initialized successfully")
         except ImportError:
-            logger.warning("OpenAI package not available. GPT-4 Vision features will be disabled.")
+            raise ModelNotAvailableError("OpenAI package not installed")
         except Exception as e:
-            logger.error(f"Error initializing OpenAI client: {e}")
-            raise
-
-    def _convert_pdf_to_image(self, pdf_path: str) -> bytes:
-        """Convert first page of PDF to PNG image"""
-        try:
-            # Convert first page of PDF to PIL Image
-            images = pdf2image.convert_from_path(pdf_path, first_page=1, last_page=1)
-            if not images:
-                raise ValueError("Failed to convert PDF to image")
-
-            # Convert PIL Image to PNG bytes
-            img_byte_arr = io.BytesIO()
-            images[0].save(img_byte_arr, format='PNG')
-            img_byte_arr.seek(0)
-            return img_byte_arr.getvalue()
-        except Exception as e:
-            logger.error(f"Error converting PDF to image: {e}")
-            raise
-
-    def _encode_image(self, image_path: str) -> str:
-        """Encode image to base64, converting PDF if necessary"""
-        try:
-            if Path(image_path).suffix.lower() == '.pdf':
-                image_bytes = self._convert_pdf_to_image(image_path)
-                return base64.b64encode(image_bytes).decode('utf-8')
-            else:
-                with open(image_path, 'rb') as img_file:
-                    return base64.b64encode(img_file.read()).decode('utf-8')
-        except Exception as e:
-            logger.error(f"Error encoding image: {e}")
-            raise
+            raise ModelNotAvailableError(f"Error initializing OpenAI client: {e}")
 
     def extract_information(self, text: str, image_path: Optional[str] = None) -> Dict[str, Any]:
-        """Extract information using GPT-4 Vision"""
         try:
-            if not hasattr(self, 'client'):
-                raise ValueError("OpenAI client not initialized")
+            messages = [
+                {
+                    "role": "system",
+                    "content": ("You are a document analysis expert. Extract key information from "
+                              "documents and format the output as JSON.")
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"""Analyze this document and extract the following information as JSON:
+                            - document_type: The type of document
+                            - dates: Any important dates
+                            - amounts: Any monetary amounts
+                            - invoice_number: Invoice number if present
+                            - entities: Names of people or organizations
 
-            # Prepare system message and user query
-            messages = [{
-                "role": "system",
-                "content": "You are a document analysis expert. Extract key information from documents and images."
-            }]
+                            Text content:
+                            {text}"""
+                        }
+                    ]
+                }
+            ]
 
-            # Add text content
-            user_message = {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": f"""Analyze this document and extract key information.
-                    
-                    Text content:
-                    {text}
-                    
-                    Please extract:
-                    1. Document type
-                    2. Key dates
-                    3. Important numbers/amounts
-                    4. Names and entities
-                    5. Key points or summary"""
-                    }
-                ]
-            }
-
-            # Add image if provided
             if image_path and Path(image_path).exists():
-                base64_image = self._encode_image(image_path)
-                user_message["content"].append({
-                    "type": "image",
-                    "image_url": {
-                        "url": f"data:image/png;base64,{base64_image}"
-                    }
-                })
-
-            messages.append(user_message)
-
-            logger.debug(f"Using model: {self.model_name}")
-            logger.debug(f"Message structure: {messages}")
+                with open(image_path, "rb") as img_file:
+                    img_data = base64.b64encode(img_file.read()).decode('utf-8')
+                    messages[-1]["content"].append({
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{img_data}"
+                        }
+                    })
 
             response = self.client.chat.completions.create(
                 model=self.model_name,
                 messages=messages,
-                max_tokens=1000
+                max_tokens=1000,
+                response_format={"type": "json_object"}
             )
 
+            result = json.loads(response.choices[0].message.content)
             return {
-                "raw_analysis": response.choices[0].message.content,
+                "raw_analysis": result,
                 "model_name": self.model_name,
                 "success": True
             }
 
-        except ImportError:
-            logger.warning("OpenAI package not available, skipping GPT-4 Vision analysis")
-            return {
-                "success": False,
-                "error": "OpenAI package not available",
-                "model_name": self.model_name
-            }
         except Exception as e:
             logger.error(f"Error in GPT-4 Vision extraction: {e}")
             return {
@@ -267,42 +189,41 @@ class GPT4VisionModel(BaseAIModel):
 class GeminiModel(BaseAIModel):
     """Integration with Google's Gemini Vision API"""
 
-    def __init__(self, model_name: str = "gemini-pro-vision"):
-        self.model_name = model_name
+    def __init__(self):
+        self.model_name = "gemini-pro-vision"
         self._init_client()
+
+    @classmethod
+    def validate_environment(cls) -> bool:
+        """Check if Google API key is available"""
+        return bool(os.getenv("GOOGLE_API_KEY"))
 
     def _init_client(self):
         """Initialize Gemini client"""
         try:
+            if not self.validate_environment():
+                raise ModelNotAvailableError("GOOGLE_API_KEY environment variable not set")
+
             import google.generativeai as genai
-            api_key = os.getenv("GOOGLE_API_KEY")
-            if not api_key:
-                raise ValueError("GOOGLE_API_KEY environment variable not set")
-            genai.configure(api_key=api_key)
+            genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
             self.genai = genai
+            logger.info("Gemini client initialized successfully")
         except ImportError:
-            logger.warning("Google Generative AI package not available. Gemini features will be disabled.")
+            raise ModelNotAvailableError("Google Generative AI package not installed")
         except Exception as e:
-            logger.error(f"Error initializing Gemini client: {e}")
-            raise
+            raise ModelNotAvailableError(f"Error initializing Gemini client: {e}")
 
     def extract_information(self, text: str, image_path: Optional[str] = None) -> Dict[str, Any]:
-        """Extract information using Gemini Vision"""
         try:
-            if not hasattr(self, 'genai'):
-                raise ValueError("Gemini client not initialized")
+            prompt = f"""Analyze this document and extract the following information as JSON:
+            - document_type: The type of document
+            - dates: Any important dates
+            - amounts: Any monetary amounts
+            - invoice_number: Invoice number if present
+            - entities: Names of people or organizations
 
-            prompt = f"""Analyze this document and extract key information.
-            
             Text content:
-            {text}
-            
-            Please extract:
-            1. Document type
-            2. Key dates
-            3. Important numbers/amounts
-            4. Names and entities
-            5. Key points or summary"""
+            {text}"""
 
             # Initialize model
             model = self.genai.GenerativeModel(self.model_name)
@@ -316,21 +237,26 @@ class GeminiModel(BaseAIModel):
                 content_parts.append(image)
 
             # Generate response
-            response = model.generate_content(content_parts)
+            response = model.generate_content(
+                content_parts,
+                generation_config={
+                    "temperature": 0.2,
+                    "top_p": 0.9,
+                }
+            )
+
+            # Try to parse response as JSON
+            try:
+                result = json.loads(response.text)
+            except json.JSONDecodeError:
+                result = {"text": response.text}
 
             return {
-                "raw_analysis": response.text,
+                "raw_analysis": result,
                 "model_name": self.model_name,
                 "success": True
             }
 
-        except ImportError:
-            logger.warning("Google Generative AI package not available, skipping Gemini analysis")
-            return {
-                "success": False,
-                "error": "Google Generative AI package not available",
-                "model_name": self.model_name
-            }
         except Exception as e:
             logger.error(f"Error in Gemini extraction: {e}")
             return {
@@ -349,10 +275,20 @@ class FallbackModel(BaseAIModel):
             words = text.split()
             word_count = len(words)
 
-            # Simple metrics
+            # Look for potential dates (simple regex)
+            import re
+            date_pattern = r'\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}'
+            dates = re.findall(date_pattern, text)
+
+            # Look for monetary amounts
+            amount_pattern = r'(?:[\$€£]\s*\d+(?:,\d{3})*(?:\.\d{2})?|\d+(?:,\d{3})*(?:\.\d{2})?\s*(?:EUR|USD|GBP))'
+            amounts = re.findall(amount_pattern, text)
+
             analysis = {
                 "text_length": len(text),
                 "word_count": word_count,
+                "dates_found": dates,
+                "amounts_found": amounts,
                 "has_image": image_path is not None
             }
 
@@ -368,3 +304,31 @@ class FallbackModel(BaseAIModel):
                 "error": str(e),
                 "model_name": "fallback"
             }
+
+def get_available_models() -> Dict[str, str]:
+    """Return a dictionary of available models and their descriptions"""
+    models = {
+        "llama-vision": "Llama 3.2 Vision via Ollama (default)",
+        "gpt4-vision": "OpenAI's GPT-4 Vision API",
+        "gemini": "Google's Gemini Pro Vision",
+        "fallback": "Basic text analysis without AI"
+    }
+
+    # Check which models are actually available
+    available = {}
+    for model_id, description in models.items():
+        try:
+            if model_id == "llama-vision":
+                LlamaVisionModel()._check_availability()
+                available[model_id] = description
+            elif model_id == "gpt4-vision" and GPT4VisionModel.validate_environment():
+                available[model_id] = description
+            elif model_id == "gemini" and GeminiModel.validate_environment():
+                available[model_id] = description
+            elif model_id == "fallback":
+                available[model_id] = description
+        except Exception as e:
+            logger.debug(f"Model {model_id} not available: {e}")
+            continue
+
+    return available

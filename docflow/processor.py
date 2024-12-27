@@ -3,7 +3,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any, Union
 from .models import (
     BaseAIModel, LlamaVisionModel, GPT4VisionModel, 
-    GeminiModel, FallbackModel
+    GeminiModel, FallbackModel, ModelNotAvailableError,
+    get_available_models
 )
 import logging
 import re
@@ -17,10 +18,14 @@ import dateutil.parser
 logger = logging.getLogger(__name__)
 
 class DocumentProcessor:
-    def __init__(self, rules_file: str = "config/default_rules.yaml", 
+    def __init__(self, rules_file: str = "config/rules.yaml", 
                  ai_model: Optional[str] = None):
         self.rules = self._load_rules(rules_file)
         self.supported_formats = {'.pdf', '.docx', '.txt'}
+
+        # Get available models
+        self.available_models = get_available_models()
+        logger.info(f"Available AI models: {list(self.available_models.keys())}")
 
         # Initialize AI model based on preference
         self.ai_model = self._initialize_ai_model(ai_model)
@@ -28,28 +33,33 @@ class DocumentProcessor:
     def _initialize_ai_model(self, model_name: Optional[str]) -> BaseAIModel:
         """Initialize the specified AI model with fallback options"""
         logger.debug(f"Initializing AI model: {model_name}")
+
         try:
-            if model_name == "llama-vision":
+            if model_name not in self.available_models and model_name is not None:
+                logger.warning(f"Requested model '{model_name}' not available")
+                model_name = None
+
+            if model_name == "llama-vision" or (model_name is None and "llama-vision" in self.available_models):
                 return LlamaVisionModel()
-            elif model_name == "gpt4-vision":
+            elif model_name == "gpt4-vision" and "gpt4-vision" in self.available_models:
                 return GPT4VisionModel()
-            elif model_name == "gemini":
+            elif model_name == "gemini" and "gemini" in self.available_models:
                 return GeminiModel()
-            elif model_name == "fallback":
+            elif model_name == "fallback" or model_name is None:
                 return FallbackModel()
-            elif model_name is None:
-                # Default to Llama Vision with fallback
-                try:
-                    return LlamaVisionModel()
-                except Exception as e:
-                    logger.warning(f"Failed to initialize Llama Vision: {e}, using fallback")
-                    return FallbackModel()
-            else:
-                logger.warning(f"Unknown model {model_name}, using fallback")
-                return FallbackModel()
+
+        except ModelNotAvailableError as e:
+            logger.warning(f"Model '{model_name}' not available: {e}")
         except Exception as e:
-            logger.error(f"Error initializing AI model {model_name}: {e}")
-            return FallbackModel()
+            logger.error(f"Error initializing model '{model_name}': {e}")
+
+        # Default to fallback model
+        logger.info("Using fallback model for document analysis")
+        return FallbackModel()
+
+    def get_supported_models(self) -> Dict[str, str]:
+        """Return dictionary of available models and their descriptions"""
+        return self.available_models
 
     def _load_rules(self, rules_file: str) -> Dict:
         try:

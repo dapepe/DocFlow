@@ -1,0 +1,15 @@
+{
+  "name": "docflowprocessor",
+  "version": "1.0.0",
+  "description": "DocFlow is a powerful document processing tool that supports PDF, DOCX, and TXT files with features for metadata extraction, document classification, and OCR capabilities.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "openai": "^4.77.0"
+  }
+}

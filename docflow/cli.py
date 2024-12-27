@@ -16,6 +16,21 @@ def cli():
     pass
 
 @cli.command()
+def models():
+    """List available AI models"""
+    processor = DocumentProcessor()
+    models = processor.get_supported_models()
+
+    table = Table(title="Available AI Models")
+    table.add_column("Model ID", style="cyan")
+    table.add_column("Description", style="green")
+
+    for model_id, description in models.items():
+        table.add_row(model_id, description)
+
+    console.print(table)
+
+@cli.command()
 @click.argument('file_path', type=click.Path(exists=True))
 @click.option('--use-ocr', is_flag=True, help="Enable OCR processing")
 @click.option('--output', '-o', type=click.Path(), help="Output file path for JSON results")
@@ -60,11 +75,11 @@ def process(file_path: str, use_ocr: bool, output: str, model: str, include_text
         console.print(table)
 
         # Handle text content display/save options
-        if include_text:
+        if include_text and 'text_content' in result:
             console.print("\nExtracted Text Content:", style="blue")
             console.print(result['text_content'])
 
-        if save_text:
+        if save_text and 'text_content' in result:
             with open(save_text, 'w', encoding='utf-8') as f:
                 f.write(result['text_content'])
             console.print(f"\nText content saved to: {save_text}", style="blue")
@@ -73,6 +88,7 @@ def process(file_path: str, use_ocr: bool, output: str, model: str, include_text
         if not include_text and not save_text and 'text_content' in result:
             del result['text_content']
 
+        # Save results to JSON if output path provided
         if output:
             import json
             with open(output, 'w') as f:
