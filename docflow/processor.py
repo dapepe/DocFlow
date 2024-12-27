@@ -1,6 +1,7 @@
 import yaml
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Union
+from .models import BaseAIModel, LlamaVisionModel, FallbackModel # Added import for FallbackModel
 import logging
 import re
 from typing import BinaryIO
@@ -13,9 +14,19 @@ import dateutil.parser
 logger = logging.getLogger(__name__)
 
 class DocumentProcessor:
-    def __init__(self, rules_file: str = "config/default_rules.yaml"):
+    def __init__(self, rules_file: str = "config/default_rules.yaml", ai_model: Optional[BaseAIModel] = None):
         self.rules = self._load_rules(rules_file)
         self.supported_formats = {'.pdf', '.docx', '.txt'}
+
+        # Try to initialize LlamaVision, fallback to basic model if not available
+        if ai_model is None:
+            try:
+                self.ai_model = LlamaVisionModel()
+            except Exception as e:
+                logger.warning(f"Failed to initialize LlamaVision model: {e}")
+                self.ai_model = FallbackModel()
+        else:
+            self.ai_model = ai_model
 
     def _load_rules(self, rules_file: str) -> Dict:
         try:
@@ -39,12 +50,12 @@ class DocumentProcessor:
         """Parse string amount to float, handling different number formats"""
         try:
             # Remove any currency symbols and whitespace
-            cleaned = re.sub(r'[^\d,.]', '', amount_str)
+            cleaned = amount_str.strip().replace('$', '').replace('€', '').replace('£', '')
 
-            # Handle German number format (1.234,56 -> 1234.56)
+            # First, remove any thousands separators (assuming US/UK format)
             if ',' in cleaned and '.' in cleaned:
-                if cleaned.rindex('.') < cleaned.rindex(','):
-                    cleaned = cleaned.replace('.', '').replace(',', '.')
+                cleaned = cleaned.replace(',', '')
+            # Then handle cases where comma is used as decimal separator
             elif ',' in cleaned and '.' not in cleaned:
                 cleaned = cleaned.replace(',', '.')
 
@@ -130,6 +141,10 @@ class DocumentProcessor:
                 required_fields.append(field_name)
 
             pattern = field_config.get('pattern', '')
+            if field_name == 'total_amount':
+                # Updated pattern to better handle currency amounts with thousands separators
+                pattern = r'(?i)(?:total|amount|sum|betrag|summe|rechnungsbetrag)[\s:]*[$€£]?\s*([\d,]+\.?\d{0,2})'
+
             logger.debug(f"Using pattern for {field_name}: {pattern}")
 
             matches = re.findall(pattern, text, re.MULTILINE | re.IGNORECASE)
@@ -174,17 +189,26 @@ class DocumentProcessor:
             # Extract text based on file type
             text = self._extract_text(file_path)
 
-            # Classify document
-            doc_type = self._classify_document(text)
+            # Use AI model for enhanced extraction if available
+            ai_analysis = None
+            try:
+                ai_analysis = self.ai_model.extract_information(
+                    text=text,
+                    image_path=file_path if path.suffix.lower() == '.pdf' else None
+                )
+            except Exception as e:
+                logger.warning(f"AI model analysis failed: {e}")
 
-            # Extract metadata
+            # Traditional processing
+            doc_type = self._classify_document(text)
             metadata = self._extract_metadata(text, doc_type)
 
             result = {
                 "file_name": path.name,
                 "document_type": doc_type,
                 "metadata": metadata,
-                "text_length": len(text)
+                "text_length": len(text),
+                "ai_analysis": ai_analysis
             }
 
             logger.info(f"Successfully processed document: {path.name}")
