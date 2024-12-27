@@ -297,8 +297,8 @@ class DocumentProcessor:
             elif field_name == 'date':
                 pattern = r'(?i)(?:invoice\s+date|date|datum|belegdatum)[\s:]*(\d{1,2}[-/\.]\d{1,2}[-/\.]\d{4})'
             elif field_name == 'invoice_number':
-                # Updated pattern to handle various invoice number formats including GC-2024/12/01
-                pattern = r'(?i)Invoice\s+No\.?:\s*((?:[A-Za-z]{1,4}[-]?\d{4}[-/]\d{1,2}[-/]\d{1,2})|(?:[A-Za-z0-9][-A-Za-z0-9/]*[A-Za-z0-9]))'
+                # Updated pattern to handle GC-2024/12/01 format
+                pattern = r'(?i)(?:Invoice\s+No\.?:|Rechnung\s+Nr\.?:|Rechnungsnummer:?|Invoice\s+number:?)\s*((?:[A-Za-z]{1,4}[-]?\d{4}[-/]\d{1,2}[-/]\d{1,2})|(?:[A-Za-z0-9][-A-Za-z0-9/]*[A-Za-z0-9]))'
 
             logger.debug(f"Using pattern for {field_name}: {pattern}")
 
@@ -310,9 +310,6 @@ class DocumentProcessor:
                 try:
                     field_type = field_config.get('type', 'String')
                     converted_value = self._convert_value(value, field_type)
-                    if field_type == 'Date' and converted_value == value:
-                        logger.warning(f"Failed to parse date value: {value}")
-                        continue
                     metadata[field_name] = converted_value
                     logger.debug(f"Field {field_name}: found and converted to {field_type}")
                 except Exception as e:

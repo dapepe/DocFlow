@@ -159,7 +159,7 @@ class GPT4VisionModel(BaseAIModel):
     """Integration with OpenAI's GPT-4 Vision API"""
 
     def __init__(self):
-        self.model_name = "gpt-4-turbo"  
+        self.model_name = "gpt-4-turbo"  # Updated from gpt-4-vision-preview
         self._init_client()
 
     @classmethod
@@ -187,7 +187,7 @@ class GPT4VisionModel(BaseAIModel):
                 {
                     "role": "system",
                     "content": ("You are a document analysis expert. Extract key information from "
-                               "documents and format the output as JSON.")
+                                "documents and format the output as JSON.")
                 },
                 {
                     "role": "user",

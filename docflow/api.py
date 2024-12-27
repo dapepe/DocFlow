@@ -72,9 +72,9 @@ async def get_available_models():
     tags=["Document Processing"])
 async def process_document(
     file: UploadFile = File(..., description="The document file (PDF, DOCX, TXT, JPG, JPEG, or PNG)"),
-    use_ocr: bool = Form(default=False, description="Enable OCR processing for documents"),
-    include_text: bool = Form(default=False, description="Include extracted text in response"),
-    convert_to_img: bool = Form(default=False, description="Convert document to image for vision model processing"),
+    use_ocr: bool = Form(default=False, description="Enable OCR processing for documents", alias="use-ocr"),
+    include_text: bool = Form(default=False, description="Include extracted text in response", alias="include-text"),
+    convert_to_img: bool = Form(default=False, description="Convert document to image for vision model processing", alias="convert-to-img"),
     model: AIModel = Form(default=AIModel.LLAMA, description="AI model to use for analysis")
 ):
     """
@@ -82,9 +82,9 @@ async def process_document(
 
     **Parameters:**
     * file: The document file to process (PDF, DOCX, TXT, JPG, JPEG, or PNG)
-    * use_ocr: Enable OCR processing for documents (default: false)
-    * include_text: Include extracted text in response (default: false)
-    * convert_to_img: Convert document to image for vision model processing (default: false)
+    * use-ocr: Enable OCR processing for documents (default: false)
+    * include-text: Include extracted text in response (default: false)
+    * convert-to-img: Convert document to image for vision model processing (default: false)
     * model: AI model to use for analysis (default: llama-vision)
 
     **Supported File Types:**
@@ -97,7 +97,7 @@ async def process_document(
     **Available Models:**
     * llama-vision (default) - Llama 3.2 Vision via Ollama (requires installation)
     * llava - LLaVA via Ollama (requires installation)
-    * gpt4-vision - OpenAI's GPT-4 Vision API (requires OPENAI_API_KEY)
+    * gpt4-vision - OpenAI's GPT-4 Turbo Vision (requires OPENAI_API_KEY)
     * gemini - Google's Gemini Pro Vision (requires GOOGLE_API_KEY)
     * fallback - Basic text analysis without AI
 
