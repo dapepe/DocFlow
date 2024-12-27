@@ -38,22 +38,41 @@ class LlamaVisionModel(BaseAIModel):
         self.model_variant = model_variant
         self.model_name = "llava" if model_variant == "llava" else "llama-3.2-vision"
         self.base_url = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-        self._check_availability()
+        try:
+            self._check_availability()
+        except Exception as e:
+            logger.warning(f"Ollama initialization failed: {e}")
+            raise ModelNotAvailableError(
+                "Ollama service not available. Please ensure Ollama is installed and running. "
+                "Visit https://ollama.ai for installation instructions."
+            )
 
     def _check_availability(self):
         """Check if Ollama service and selected model is available"""
         try:
-            response = requests.get(f"{self.base_url}/api/tags")
+            # Add timeout to prevent hanging
+            response = requests.get(f"{self.base_url}/api/tags", timeout=5)
             if response.status_code != 200:
-                raise ModelNotAvailableError("Ollama service not available")
+                raise ModelNotAvailableError(
+                    f"Ollama service returned status code: {response.status_code}"
+                )
 
             # Check if selected model is available
             models = response.json().get('models', [])
             model_exists = any(m.get('name', '').startswith(self.model_name) for m in models)
             if not model_exists:
-                raise ModelNotAvailableError(f"{self.model_name} model not found in Ollama")
+                raise ModelNotAvailableError(
+                    f"{self.model_name} model not found in Ollama. "
+                    f"Run 'ollama pull {self.model_name}' to download it."
+                )
 
+            logger.info(f"Successfully connected to Ollama service. Model {self.model_name} is available.")
             logger.debug(f"Available Ollama models: {response.json()}")
+        except requests.exceptions.ConnectionError as e:
+            raise ModelNotAvailableError(
+                "Cannot connect to Ollama service. Please ensure Ollama is installed and running "
+                "on http://localhost:11434 or set OLLAMA_HOST environment variable."
+            )
         except Exception as e:
             logger.error(f"Error checking Ollama availability: {e}")
             raise ModelNotAvailableError(f"Ollama service error: {e}")
@@ -343,10 +362,10 @@ class FallbackModel(BaseAIModel):
 def get_available_models() -> Dict[str, str]:
     """Return a dictionary of available models and their descriptions"""
     models = {
-        "llava": "LLaVA via Ollama (local AI model)",
-        "llama-vision": "Llama 3.2 Vision via Ollama (local AI model)",
-        "gpt4-vision": "OpenAI's GPT-4 Vision API",
-        "gemini": "Google's Gemini Pro Vision",
+        "llava": "LLaVA via Ollama (requires Ollama installation)",
+        "llama-vision": "Llama 3.2 Vision via Ollama (requires Ollama installation)",
+        "gpt4-vision": "OpenAI's GPT-4 Vision API (requires OPENAI_API_KEY)",
+        "gemini": "Google's Gemini Pro Vision (requires GOOGLE_API_KEY)",
         "fallback": "Basic text analysis without AI"
     }
 
