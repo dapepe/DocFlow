@@ -23,8 +23,8 @@ class BaseAIModel(ABC):
 class LlamaVisionModel(BaseAIModel):
     """Integration with Ollama via HTTP API"""
 
-    def __init__(self, model_name: str = "gpt4-mini"):
-        self.model_name = model_name
+    def __init__(self):
+        self.model_name = "llama-3.2-vision"
         self.base_url = os.getenv("OLLAMA_HOST", "http://localhost:11434")
         self._check_availability()
 
@@ -34,24 +34,43 @@ class LlamaVisionModel(BaseAIModel):
             response = requests.get(f"{self.base_url}/api/tags")
             if response.status_code != 200:
                 raise ConnectionError("Ollama service not available")
-            available_models = response.json().get("models", [])
-            if self.model_name not in [m.get("name") for m in available_models]:
-                logger.warning(f"Model {self.model_name} not found in available models")
+            logger.debug(f"Available Ollama models: {response.json()}")
         except Exception as e:
             logger.error(f"Error checking Ollama availability: {e}")
             raise
 
-    def _encode_image(self, image_path: str) -> str:
-        """Encode image to base64"""
+    def _convert_pdf_to_image(self, pdf_path: str) -> bytes:
+        """Convert first page of PDF to PNG image"""
         try:
-            with open(image_path, 'rb') as img_file:
-                return base64.b64encode(img_file.read()).decode('utf-8')
+            # Convert first page of PDF to PIL Image
+            images = pdf2image.convert_from_path(pdf_path, first_page=1, last_page=1)
+            if not images:
+                raise ValueError("Failed to convert PDF to image")
+
+            # Convert PIL Image to PNG bytes
+            img_byte_arr = io.BytesIO()
+            images[0].save(img_byte_arr, format='PNG')
+            img_byte_arr.seek(0)
+            return img_byte_arr.getvalue()
+        except Exception as e:
+            logger.error(f"Error converting PDF to image: {e}")
+            raise
+
+    def _encode_image(self, image_path: str) -> str:
+        """Encode image to base64, converting PDF if necessary"""
+        try:
+            if Path(image_path).suffix.lower() == '.pdf':
+                image_bytes = self._convert_pdf_to_image(image_path)
+                return base64.b64encode(image_bytes).decode('utf-8')
+            else:
+                with open(image_path, 'rb') as img_file:
+                    return base64.b64encode(img_file.read()).decode('utf-8')
         except Exception as e:
             logger.error(f"Error encoding image: {e}")
             raise
 
     def extract_information(self, text: str, image_path: Optional[str] = None) -> Dict[str, Any]:
-        """Extract information using GPT4-mini through Ollama API"""
+        """Extract information using Llama Vision through Ollama API"""
         try:
             # Prepare the prompt
             prompt = f"""Analyze this document and extract key information.
@@ -59,12 +78,12 @@ class LlamaVisionModel(BaseAIModel):
             Text content:
             {text}
 
-            Please extract:
-            1. Document type
-            2. Key dates
-            3. Important numbers/amounts
-            4. Names and entities
-            5. Key points or summary
+            Please extract and format the response as JSON with these fields:
+            1. document_type: The type of document (e.g., invoice, contract, report)
+            2. dates: List of important dates found
+            3. amounts: List of monetary amounts found
+            4. entities: List of names and organizations
+            5. summary: Brief summary of key points
             """
 
             # Prepare the API request
@@ -74,15 +93,18 @@ class LlamaVisionModel(BaseAIModel):
                 "stream": False,
                 "options": {
                     "temperature": 0.2,
-                    "top_p": 0.9
+                    "top_p": 0.9,
+                    "num_predict": 1000
                 }
             }
 
             # If image is provided, add it to the payload
             if image_path and Path(image_path).exists():
                 payload["images"] = [self._encode_image(image_path)]
+                logger.debug("Added image to Ollama request")
 
             # Make API request
+            logger.debug(f"Sending request to Ollama API: {self.base_url}/api/generate")
             response = requests.post(
                 f"{self.base_url}/api/generate",
                 json=payload,
@@ -93,6 +115,7 @@ class LlamaVisionModel(BaseAIModel):
                 raise Exception(f"Ollama API error: {response.text}")
 
             result = response.json()
+            logger.debug(f"Ollama API response: {result}")
 
             return {
                 "raw_analysis": result.get("response", ""),
@@ -108,7 +131,7 @@ class LlamaVisionModel(BaseAIModel):
                 "model_name": self.model_name
             }
         except Exception as e:
-            logger.error(f"Error in GPT4-mini extraction: {e}")
+            logger.error(f"Error in Llama Vision extraction: {e}")
             return {
                 "success": False,
                 "error": str(e),
@@ -185,16 +208,16 @@ class GPT4VisionModel(BaseAIModel):
                     {
                         "type": "text",
                         "text": f"""Analyze this document and extract key information.
-
-Text content:
-{text}
-
-Please extract:
-1. Document type
-2. Key dates
-3. Important numbers/amounts
-4. Names and entities
-5. Key points or summary"""
+                    
+                    Text content:
+                    {text}
+                    
+                    Please extract:
+                    1. Document type
+                    2. Key dates
+                    3. Important numbers/amounts
+                    4. Names and entities
+                    5. Key points or summary"""
                     }
                 ]
             }
@@ -270,10 +293,10 @@ class GeminiModel(BaseAIModel):
                 raise ValueError("Gemini client not initialized")
 
             prompt = f"""Analyze this document and extract key information.
-
+            
             Text content:
             {text}
-
+            
             Please extract:
             1. Document type
             2. Key dates

@@ -28,27 +28,15 @@ class DocumentProcessor:
     def _initialize_ai_model(self, model_name: Optional[str]) -> BaseAIModel:
         """Initialize the specified AI model with fallback options"""
         try:
-            if model_name == "gpt4-vision":
-                return GPT4VisionModel()
-            elif model_name == "gemini":
-                return GeminiModel()
-            elif model_name == "llama-vision":
+            if model_name == "llama-vision":
                 return LlamaVisionModel()
             elif model_name is None:
-                # Try models in order of preference - GPT-4 Vision first
+                # Default to Llama Vision
                 try:
-                    return GPT4VisionModel()
-                except Exception as e1:
-                    logger.warning(f"Failed to initialize GPT-4 Vision: {e1}")
-                    try:
-                        return GeminiModel()
-                    except Exception as e2:
-                        logger.warning(f"Failed to initialize Gemini: {e2}")
-                        try:
-                            return LlamaVisionModel()
-                        except Exception as e3:
-                            logger.warning(f"Failed to initialize Llama Vision: {e3}")
-                            return FallbackModel()
+                    return LlamaVisionModel()
+                except Exception as e:
+                    logger.warning(f"Failed to initialize Llama Vision: {e}")
+                    return FallbackModel()
             else:
                 logger.warning(f"Unknown model {model_name}, using fallback")
                 return FallbackModel()
