@@ -38,6 +38,7 @@ processor = DocumentProcessor()
 
 class AIModel(str, Enum):
     """Enum for available AI models"""
+    LLAVA = "llava"
     LLAMA = "llama-vision"
     GPT4 = "gpt4-vision"
     GEMINI = "gemini"
@@ -73,7 +74,7 @@ async def process_document(
     file: UploadFile = File(..., description="The document file (PDF, DOCX, or TXT)"),
     use_ocr: bool = Form(False, alias="use-ocr", description="Whether to use OCR for processing"),
     include_text: bool = Form(False, alias="include-text", description="Whether to include extracted text in the response"),
-    model: AIModel = Form(AIModel.LLAMA, description="AI model to use for analysis")
+    model: AIModel = Form(AIModel.LLAVA, description="AI model to use for analysis")
 ):
     """
     Process a document and extract metadata.
@@ -91,7 +92,8 @@ async def process_document(
     * TXT
 
     **Available Models:**
-    * llama-vision (default) - Llama Vision via Ollama
+    * llava (default) - LLaVA via Ollama
+    * llama-vision - Llama 3.2 Vision via Ollama
     * gpt4-vision - OpenAI's GPT-4 Vision
     * gemini - Google's Gemini Pro Vision
     * fallback - Basic text analysis
