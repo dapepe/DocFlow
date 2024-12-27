@@ -73,10 +73,11 @@ class DocumentProcessor:
             # Remove any currency symbols and whitespace
             cleaned = amount_str.strip().replace('$', '').replace('€', '').replace('£', '')
 
-            # First, remove any thousands separators (assuming US/UK format)
-            if ',' in cleaned and '.' in cleaned:
-                cleaned = cleaned.replace(',', '')
-            # Then handle cases where comma is used as decimal separator
+            # Handle European number format (1.234,56)
+            if '.' in cleaned and ',' in cleaned:
+                # Remove thousands separator (dot) and replace decimal comma with dot
+                cleaned = cleaned.replace('.', '').replace(',', '.')
+            # Handle cases where comma is used as decimal separator
             elif ',' in cleaned and '.' not in cleaned:
                 cleaned = cleaned.replace(',', '.')
 
@@ -163,12 +164,12 @@ class DocumentProcessor:
 
             pattern = field_config.get('pattern', '')
             if field_name == 'total_amount':
-                pattern = r'(?i)(?:total|amount|sum|betrag|summe|rechnungsbetrag)[\s:]*[$€£]?\s*([\d,]+\.?\d{0,2})'
+                pattern = r'(?i)(?:total\s+net|amount\s+due|total|amount|sum|betrag|summe|rechnungsbetrag)[\s:]*[$€£]?\s*([\d.,]+(?:[\.,]\d{2})?)\s*[$€£]?'
             elif field_name == 'date':
                 # Updated pattern to be more specific for invoice dates
                 pattern = r'(?i)(?:invoice\s+date|date|datum|belegdatum)[\s:]*(\d{1,2}[-/\.]\d{1,2}[-/\.]\d{4})'
             elif field_name == 'invoice_number':
-                pattern = r'(?i)(?:invoice|bill|rechnung|beleg)(?:\s*(?:no|number|nummer|#)?[:\s]*)([\w-]+)'
+                pattern = r'(?i)(?:invoice\s*(?:no|number|#|:|\.)|bill\s*(?:no|number|#|:|\.)|rechnung\s*(?:nr|nummer|#|:|\.)|beleg\s*(?:nr|nummer|#|:|\.))[\s:]*([A-Za-z0-9][-A-Za-z0-9/]*[A-Za-z0-9])'
 
             logger.debug(f"Using pattern for {field_name}: {pattern}")
 
