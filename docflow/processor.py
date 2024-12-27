@@ -151,6 +151,7 @@ class DocumentProcessor:
         return best_type
 
     def process_document(self, file_path: str, use_ocr: bool = False, convert_to_img: bool = False) -> Dict:
+        """Process a document with the selected AI model and extract information."""
         try:
             path = Path(file_path)
             if path.suffix.lower() not in self.supported_formats:
@@ -161,21 +162,40 @@ class DocumentProcessor:
 
             # Convert to image if requested or needed for vision models
             if convert_to_img and path.suffix.lower() == '.pdf':
-                image_path = self._process_pdf_for_vision(file_path)
+                temp_image_path = self._process_pdf_for_vision(file_path)
+                # Only use the converted image if we don't already have one
+                if not image_path:
+                    image_path = temp_image_path
 
             # Use AI model for enhanced extraction if available
             ai_analysis = None
             try:
+                logger.info(f"Processing with AI model: {self.ai_model.__class__.__name__}")
                 ai_analysis = self.ai_model.extract_information(
                     text=text,
                     image_path=image_path or (file_path if path.suffix.lower() in {'.jpg', '.jpeg', '.png', '.pdf'} else None)
                 )
+                if not ai_analysis.get('success'):
+                    logger.warning(f"AI analysis failed: {ai_analysis.get('error', 'Unknown error')}")
             except Exception as e:
-                logger.warning(f"AI model analysis failed: {e}")
+                logger.error(f"AI model analysis failed: {e}", exc_info=True)
+                ai_analysis = {
+                    "success": False,
+                    "error": str(e),
+                    "model_name": getattr(self.ai_model, 'model_name', 'unknown')
+                }
 
-            # Traditional processing
+            # Traditional processing for metadata extraction
             doc_type = self._classify_document(text)
             metadata = self._extract_metadata(text, doc_type)
+
+            # Use AI analysis to enhance document classification if available
+            if ai_analysis and ai_analysis.get('success'):
+                ai_doc_type = ai_analysis.get('raw_analysis', {}).get('document_type')
+                if ai_doc_type and doc_type == "unknown":
+                    doc_type = ai_doc_type.lower()
+                    # Re-extract metadata with new document type
+                    metadata.update(self._extract_metadata(text, doc_type))
 
             result = {
                 "file_name": path.name,
@@ -197,11 +217,11 @@ class DocumentProcessor:
             return result
 
         except Exception as e:
-            logger.error(f"Error processing document {file_path}: {e}")
+            logger.error(f"Error processing document {file_path}: {e}", exc_info=True)
             raise
 
     def _initialize_ai_model(self, model_name: Optional[str]) -> BaseAIModel:
-        """Initialize the specified AI model with fallback options"""
+        """Initialize the specified AI model with proper error handling"""
         logger.debug(f"Initializing AI model: {model_name}")
 
         try:
@@ -212,28 +232,30 @@ class DocumentProcessor:
             if model_name in ["llava", "llama-vision"]:
                 # Use appropriate variant based on model name
                 variant = "llava" if model_name == "llava" else "llama-3.2-vision"
+                logger.info(f"Initializing Ollama model with variant: {variant}")
                 try:
                     return LlamaVisionModel(model_variant=variant)
-                except ModelNotAvailableError:
-                    logger.error(f"Failed to initialize {model_name}")
+                except ModelNotAvailableError as e:
+                    logger.error(f"Failed to initialize {model_name}: {e}")
                     raise
             elif model_name == "gpt4-vision" and "gpt4-vision" in self.available_models:
                 return GPT4VisionModel()
             elif model_name == "gemini" and "gemini" in self.available_models:
                 return GeminiModel()
-            elif model_name == "fallback" or model_name is None:
+
+            # Only use fallback if explicitly requested or no model specified
+            if model_name == "fallback" or model_name is None:
                 return FallbackModel()
 
             raise ModelNotAvailableError(f"Model '{model_name}' initialization failed")
 
         except ModelNotAvailableError as e:
-            # Only use fallback if explicitly requested
             if model_name == "fallback":
                 return FallbackModel()
             logger.error(f"Model '{model_name}' not available: {e}")
             raise
         except Exception as e:
-            logger.error(f"Error initializing model '{model_name}': {e}")
+            logger.error(f"Error initializing model '{model_name}': {e}", exc_info=True)
             raise ModelNotAvailableError(f"Failed to initialize model '{model_name}': {e}")
 
     def get_supported_models(self) -> Dict[str, str]:
