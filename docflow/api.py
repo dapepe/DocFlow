@@ -72,17 +72,17 @@ async def get_available_models():
     tags=["Document Processing"])
 async def process_document(
     file: UploadFile = File(..., description="The document file (PDF, DOCX, or TXT)"),
-    use_ocr: bool = Form(False, alias="use-ocr", description="Enable OCR processing for documents"),
-    include_text: bool = Form(False, alias="include-text", description="Include extracted text in response"),
-    model: AIModel = Form(AIModel.LLAVA, description="AI model to use for analysis")
+    use_ocr: bool = Form(default=False, description="Enable OCR processing for documents"),
+    include_text: bool = Form(default=False, description="Include extracted text in response"),
+    model: AIModel = Form(default=AIModel.LLAVA, description="AI model to use for analysis")
 ):
     """
     Process a document and extract metadata.
 
     **Parameters:**
     * file: The document file to process (PDF, DOCX, or TXT)
-    * use-ocr: Enable OCR processing for documents (default: false)
-    * include-text: Include extracted text in response (default: false)
+    * use_ocr: Enable OCR processing for documents (default: false)
+    * include_text: Include extracted text in response (default: false)
     * model: AI model to use for analysis (default: llava)
 
     **Supported File Types:**
