@@ -16,3 +16,5 @@ twilio
 openai
 pdf2image
 trafilatura
+pdf2image
+pillow
