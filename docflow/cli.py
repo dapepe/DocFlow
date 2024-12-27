@@ -19,10 +19,13 @@ def cli():
 @click.argument('file_path', type=click.Path(exists=True))
 @click.option('--ocr', is_flag=True, help="Enable OCR processing")
 @click.option('--output', '-o', type=click.Path(), help="Output file path for JSON results")
-def process(file_path: str, ocr: bool, output: str):
+@click.option('--model', '-m', 
+              type=click.Choice(['gpt4-vision', 'gemini', 'llama-vision']), 
+              help="Choose AI model for analysis")
+def process(file_path: str, ocr: bool, output: str, model: str):
     """Process a single document"""
     try:
-        processor = DocumentProcessor()
+        processor = DocumentProcessor(ai_model=model)
         result = processor.process_document(file_path, use_ocr=ocr)
 
         # Create result table
@@ -30,12 +33,26 @@ def process(file_path: str, ocr: bool, output: str):
         table.add_column("Field", style="cyan")
         table.add_column("Value", style="green")
 
+        # Add basic fields
         table.add_row("Document Type", result['document_type'])
         table.add_row("Text Length", str(result['text_length']))
-        
+
         # Add metadata rows
-        for key, value in result['metadata'].items():
+        for key, value in result.get('metadata', {}).items():
             table.add_row(key, str(value))
+
+        # Add AI analysis summary if available
+        ai_analysis = result.get('ai_analysis', {})
+        if ai_analysis and ai_analysis.get('success'):
+            table.add_row("AI Model", ai_analysis.get('model_name', 'Unknown'))
+            raw_analysis = ai_analysis.get('raw_analysis', '')
+            if isinstance(raw_analysis, dict):
+                for key, value in raw_analysis.items():
+                    table.add_row(f"AI {key}", str(value))
+            else:
+                # Truncate long analysis text for display
+                analysis_preview = str(raw_analysis)[:200] + "..." if len(str(raw_analysis)) > 200 else str(raw_analysis)
+                table.add_row("AI Analysis", analysis_preview)
 
         console.print(table)
 

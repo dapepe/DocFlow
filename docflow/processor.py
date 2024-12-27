@@ -1,7 +1,10 @@
 import yaml
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Union
-from .models import BaseAIModel, LlamaVisionModel, FallbackModel # Added import for FallbackModel
+from .models import (
+    BaseAIModel, LlamaVisionModel, GPT4VisionModel, 
+    GeminiModel, FallbackModel
+)
 import logging
 import re
 from typing import BinaryIO
@@ -14,19 +17,44 @@ import dateutil.parser
 logger = logging.getLogger(__name__)
 
 class DocumentProcessor:
-    def __init__(self, rules_file: str = "config/default_rules.yaml", ai_model: Optional[BaseAIModel] = None):
+    def __init__(self, rules_file: str = "config/default_rules.yaml", 
+                 ai_model: Optional[str] = None):
         self.rules = self._load_rules(rules_file)
         self.supported_formats = {'.pdf', '.docx', '.txt'}
 
-        # Try to initialize LlamaVision, fallback to basic model if not available
-        if ai_model is None:
-            try:
-                self.ai_model = LlamaVisionModel()
-            except Exception as e:
-                logger.warning(f"Failed to initialize LlamaVision model: {e}")
-                self.ai_model = FallbackModel()
-        else:
-            self.ai_model = ai_model
+        # Initialize AI model based on preference
+        self.ai_model = self._initialize_ai_model(ai_model)
+
+    def _initialize_ai_model(self, model_name: Optional[str]) -> BaseAIModel:
+        """Initialize the specified AI model with fallback options"""
+        try:
+            if model_name == "gpt4-vision":
+                return GPT4VisionModel()
+            elif model_name == "gemini":
+                return GeminiModel()
+            elif model_name == "llama-vision":
+                return LlamaVisionModel()
+            elif model_name is None:
+                # Try models in order of preference
+                try:
+                    return GPT4VisionModel()
+                except Exception as e1:
+                    logger.warning(f"Failed to initialize GPT-4 Vision: {e1}")
+                    try:
+                        return GeminiModel()
+                    except Exception as e2:
+                        logger.warning(f"Failed to initialize Gemini: {e2}")
+                        try:
+                            return LlamaVisionModel()
+                        except Exception as e3:
+                            logger.warning(f"Failed to initialize Llama Vision: {e3}")
+                            return FallbackModel()
+            else:
+                logger.warning(f"Unknown model {model_name}, using fallback")
+                return FallbackModel()
+        except Exception as e:
+            logger.error(f"Error initializing AI model: {e}, using fallback")
+            return FallbackModel()
 
     def _load_rules(self, rules_file: str) -> Dict:
         try:
