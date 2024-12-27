@@ -115,7 +115,7 @@ class LlamaVisionModel(BaseAIModel):
 class GPT4VisionModel(BaseAIModel):
     """Integration with OpenAI's GPT-4 Vision API"""
 
-    def __init__(self, model_name: str = "gpt-4-vision-preview-1106"):
+    def __init__(self, model_name: str = "gpt-4-vision-preview"):
         self.model_name = model_name
         self._init_client()
 
@@ -170,8 +170,7 @@ Please extract:
                 content.append({
                     "type": "image_url",
                     "image_url": {
-                        "url": f"data:image/jpeg;base64,{base64_image}",
-                        "detail": "high"
+                        "url": f"data:image/jpeg;base64,{base64_image}"
                     }
                 })
 
