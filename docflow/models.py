@@ -1,5 +1,7 @@
+import json
+import requests
 from abc import ABC, abstractmethod
-from typing import Dict, Optional, Any, BinaryIO
+from typing import Dict, Optional, Any
 import logging
 from pathlib import Path
 import base64
@@ -16,29 +18,24 @@ class BaseAIModel(ABC):
         pass
 
 class LlamaVisionModel(BaseAIModel):
-    """Integration with Llama 3.2 Vision via Ollama"""
+    """Integration with Ollama via HTTP API"""
 
-    def __init__(self, model_name: str = "llama2-vision"):
+    def __init__(self, model_name: str = "gpt4-mini"):
         self.model_name = model_name
-        self._ensure_model()
+        self.base_url = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+        self._check_availability()
 
-    def _ensure_model(self):
-        """Ensure the model is available in Ollama"""
+    def _check_availability(self):
+        """Check if Ollama service is available"""
         try:
-            # Try importing ollama only when needed
-            import ollama
-            # Check if model exists, pull if it doesn't
-            try:
-                ollama.pull(self.model_name)
-                logger.info(f"Successfully pulled {self.model_name} model")
-            except Exception as e:
-                logger.warning(f"Failed to pull model {self.model_name}: {e}")
-                raise
-        except ImportError:
-            logger.warning("Ollama Python package not available. LlamaVision features will be disabled.")
-            raise
+            response = requests.get(f"{self.base_url}/api/tags")
+            if response.status_code != 200:
+                raise ConnectionError("Ollama service not available")
+            available_models = response.json().get("models", [])
+            if self.model_name not in [m.get("name") for m in available_models]:
+                logger.warning(f"Model {self.model_name} not found in available models")
         except Exception as e:
-            logger.error(f"Error ensuring model availability: {e}")
+            logger.error(f"Error checking Ollama availability: {e}")
             raise
 
     def _encode_image(self, image_path: str) -> str:
@@ -51,11 +48,8 @@ class LlamaVisionModel(BaseAIModel):
             raise
 
     def extract_information(self, text: str, image_path: Optional[str] = None) -> Dict[str, Any]:
-        """Extract information using Llama Vision"""
+        """Extract information using GPT4-mini through Ollama API"""
         try:
-            # Try importing ollama only when needed
-            import ollama
-
             # Prepare the prompt
             prompt = f"""Analyze this document and extract key information.
 
@@ -70,39 +64,48 @@ class LlamaVisionModel(BaseAIModel):
             5. Key points or summary
             """
 
-            # Prepare the message
-            message = {"role": "user", "content": prompt}
+            # Prepare the API request
+            payload = {
+                "model": self.model_name,
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "temperature": 0.2,
+                    "top_p": 0.9
+                }
+            }
 
-            # If image is provided, add it to the message
+            # If image is provided, add it to the payload
             if image_path and Path(image_path).exists():
-                encoded_image = self._encode_image(image_path)
-                message["images"] = [encoded_image]
+                payload["images"] = [self._encode_image(image_path)]
 
-            # Get response from model
-            response = ollama.chat(
-                model=self.model_name,
-                messages=[message],
-                stream=False
+            # Make API request
+            response = requests.post(
+                f"{self.base_url}/api/generate",
+                json=payload,
+                timeout=30
             )
 
-            # Process and structure the response
-            raw_response = response['message']['content']
+            if response.status_code != 200:
+                raise Exception(f"Ollama API error: {response.text}")
+
+            result = response.json()
 
             return {
-                "raw_analysis": raw_response,
+                "raw_analysis": result.get("response", ""),
                 "model_name": self.model_name,
                 "success": True
             }
 
-        except ImportError:
-            logger.warning("Ollama package not available, skipping AI analysis")
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error connecting to Ollama service: {e}")
             return {
                 "success": False,
-                "error": "Ollama package not available",
+                "error": "Ollama service unavailable",
                 "model_name": self.model_name
             }
         except Exception as e:
-            logger.error(f"Error in Llama Vision extraction: {e}")
+            logger.error(f"Error in GPT4-mini extraction: {e}")
             return {
                 "success": False,
                 "error": str(e),

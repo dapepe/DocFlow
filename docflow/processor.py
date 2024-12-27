@@ -35,7 +35,7 @@ class DocumentProcessor:
             elif model_name == "llama-vision":
                 return LlamaVisionModel()
             elif model_name is None:
-                # Try models in order of preference
+                # Try models in order of preference - GPT-4 Vision first
                 try:
                     return GPT4VisionModel()
                 except Exception as e1:
