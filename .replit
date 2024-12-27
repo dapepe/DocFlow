@@ -31,7 +31,7 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python main.py serve --port 8000"
+args = "python main.py serve --host 0.0.0.0 --port 8000"
 waitForPort = 8000
 
 [[workflows.workflow]]
@@ -49,7 +49,7 @@ task = "shell.exec"
 args = "python main.py process test_invoice.txt"
 
 [deployment]
-run = ["sh", "-c", "python main.py serve --port 8000"]
+run = ["sh", "-c", "python main.py serve --host 0.0.0.0 --port 8000"]
 
 [[ports]]
 localPort = 8000
