@@ -5,7 +5,7 @@ from enum import Enum
 import tempfile
 import os
 from pathlib import Path
-from .processor import DocumentProcessor
+from .processor import DocumentProcessor, ModelNotAvailableError
 import logging
 
 logger = logging.getLogger(__name__)
@@ -96,6 +96,7 @@ async def process_document(
 
     **Available Models:**
     * llama-vision (default) - Llama 3.2 Vision via Ollama (requires installation)
+    * llava - LLaVA via Ollama (requires installation)
     * gpt4-vision - OpenAI's GPT-4 Vision API (requires OPENAI_API_KEY)
     * gemini - Google's Gemini Pro Vision (requires GOOGLE_API_KEY)
     * fallback - Basic text analysis without AI
@@ -123,7 +124,14 @@ async def process_document(
 
         try:
             # Initialize processor with selected model
-            processor_instance = DocumentProcessor(ai_model=model.value)
+            try:
+                processor_instance = DocumentProcessor(ai_model=model.value)
+            except ModelNotAvailableError as e:
+                raise HTTPException(
+                    status_code=400,
+                    detail=str(e)
+                )
+
             result = processor_instance.process_document(
                 temp_path, 
                 use_ocr=use_ocr,
@@ -141,4 +149,6 @@ async def process_document(
 
     except Exception as e:
         logger.error(f"Error processing document: {e}")
+        if isinstance(e, HTTPException):
+            raise
         raise HTTPException(status_code=500, detail=str(e))

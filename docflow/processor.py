@@ -207,12 +207,16 @@ class DocumentProcessor:
         try:
             if model_name not in self.available_models and model_name is not None:
                 logger.warning(f"Requested model '{model_name}' not available")
-                model_name = None
+                raise ModelNotAvailableError(f"Model '{model_name}' is not available")
 
             if model_name in ["llava", "llama-vision"]:
                 # Use appropriate variant based on model name
                 variant = "llava" if model_name == "llava" else "llama-3.2-vision"
-                return LlamaVisionModel(model_variant=variant)
+                try:
+                    return LlamaVisionModel(model_variant=variant)
+                except ModelNotAvailableError:
+                    logger.error(f"Failed to initialize {model_name}")
+                    raise
             elif model_name == "gpt4-vision" and "gpt4-vision" in self.available_models:
                 return GPT4VisionModel()
             elif model_name == "gemini" and "gemini" in self.available_models:
@@ -220,14 +224,17 @@ class DocumentProcessor:
             elif model_name == "fallback" or model_name is None:
                 return FallbackModel()
 
+            raise ModelNotAvailableError(f"Model '{model_name}' initialization failed")
+
         except ModelNotAvailableError as e:
-            logger.warning(f"Model '{model_name}' not available: {e}")
+            # Only use fallback if explicitly requested
+            if model_name == "fallback":
+                return FallbackModel()
+            logger.error(f"Model '{model_name}' not available: {e}")
+            raise
         except Exception as e:
             logger.error(f"Error initializing model '{model_name}': {e}")
-
-        # Default to fallback model
-        logger.info("Using fallback model for document analysis")
-        return FallbackModel()
+            raise ModelNotAvailableError(f"Failed to initialize model '{model_name}': {e}")
 
     def get_supported_models(self) -> Dict[str, str]:
         """Return dictionary of available models and their descriptions"""
