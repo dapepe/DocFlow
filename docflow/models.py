@@ -187,7 +187,7 @@ class GPT4VisionModel(BaseAIModel):
                 {
                     "role": "system",
                     "content": ("You are a document analysis expert. Extract key information from "
-                                  "documents and format the output as JSON.")
+                               "documents and format the output as JSON.")
                 },
                 {
                     "role": "user",
