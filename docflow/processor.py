@@ -55,12 +55,17 @@ class DocumentProcessor:
     def _parse_date(self, date_str: str) -> str:
         """Parse date string to YYYY-MM-DD format"""
         try:
+            # Clean up the date string
+            date_str = date_str.strip()
             # Parse the date string using dateutil
             parsed_date = dateutil.parser.parse(date_str)
+            # Validate year is reasonable (between 1900 and 2100)
+            if parsed_date.year < 1900 or parsed_date.year > 2100:
+                raise ValueError(f"Invalid year in date: {parsed_date.year}")
             return parsed_date.strftime('%Y-%m-%d')
         except Exception as e:
             logger.error(f"Error parsing date {date_str}: {e}")
-            return date_str
+            raise ValueError(f"Invalid date format: {date_str}")
 
     def _parse_float(self, amount_str: str) -> float:
         """Parse string amount to float, handling different number formats"""
@@ -158,8 +163,12 @@ class DocumentProcessor:
 
             pattern = field_config.get('pattern', '')
             if field_name == 'total_amount':
-                # Updated pattern to better handle currency amounts with thousands separators
                 pattern = r'(?i)(?:total|amount|sum|betrag|summe|rechnungsbetrag)[\s:]*[$€£]?\s*([\d,]+\.?\d{0,2})'
+            elif field_name == 'date':
+                # Updated pattern to be more specific for invoice dates
+                pattern = r'(?i)(?:invoice\s+date|date|datum|belegdatum)[\s:]*(\d{1,2}[-/\.]\d{1,2}[-/\.]\d{4})'
+            elif field_name == 'invoice_number':
+                pattern = r'(?i)(?:invoice|bill|rechnung|beleg)(?:\s*(?:no|number|nummer|#)?[:\s]*)([\w-]+)'
 
             logger.debug(f"Using pattern for {field_name}: {pattern}")
 
@@ -167,11 +176,19 @@ class DocumentProcessor:
             if matches:
                 # Extract the first captured group or the entire match
                 value = matches[0][0] if isinstance(matches[0], tuple) else matches[0]
-                # Convert value to the specified type
-                field_type = field_config.get('type', 'String')
-                converted_value = self._convert_value(value, field_type)
-                metadata[field_name] = converted_value
-                logger.debug(f"Field {field_name}: found and converted to {field_type}")
+                try:
+                    # Convert value to the specified type
+                    field_type = field_config.get('type', 'String')
+                    converted_value = self._convert_value(value, field_type)
+                    if field_type == 'Date' and converted_value == value:
+                        # If date parsing failed (returned original string), skip this match
+                        logger.warning(f"Failed to parse date value: {value}")
+                        continue
+                    metadata[field_name] = converted_value
+                    logger.debug(f"Field {field_name}: found and converted to {field_type}")
+                except Exception as e:
+                    logger.error(f"Error converting field {field_name}: {e}")
+                    continue
             elif field_name in required_fields:
                 logger.warning(f"Required field {field_name} not found in document")
 

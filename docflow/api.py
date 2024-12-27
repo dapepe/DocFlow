@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import tempfile
@@ -53,7 +53,8 @@ async def root():
     tags=["Document Processing"])
 async def process_document(
     file: UploadFile = File(..., description="The document file (PDF, DOCX, or TXT)"),
-    use_ocr: bool = File(False, description="Whether to use OCR for processing")
+    use_ocr: bool = Form(False, alias="use-ocr", description="Whether to use OCR for processing"),
+    include_text: bool = Form(False, alias="include-text", description="Whether to include extracted text in the response")
 ):
     """
     Process a document and extract metadata.
@@ -62,6 +63,7 @@ async def process_document(
     * Document classification
     * Metadata extraction
     * OCR processing (optional)
+    * Full text extraction (optional)
 
     **Supported File Types:**
     * PDF
@@ -71,7 +73,7 @@ async def process_document(
     **Returns:**
     - document_type: The classified type of the document
     - metadata: Extracted metadata fields
-    - text_length: Length of the extracted text
+    - text_content: Full extracted text (if include-text is True)
     """
     try:
         # Get original file extension
@@ -90,6 +92,11 @@ async def process_document(
 
         try:
             result = processor.process_document(temp_path, use_ocr)
+
+            # Remove text_content if not requested
+            if not include_text and 'text_content' in result:
+                del result['text_content']
+
             return JSONResponse(content=result)
         finally:
             # Clean up temporary file

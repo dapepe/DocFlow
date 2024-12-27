@@ -17,18 +17,18 @@ def cli():
 
 @cli.command()
 @click.argument('file_path', type=click.Path(exists=True))
-@click.option('--ocr', is_flag=True, help="Enable OCR processing")
+@click.option('--use-ocr', is_flag=True, help="Enable OCR processing")
 @click.option('--output', '-o', type=click.Path(), help="Output file path for JSON results")
 @click.option('--model', '-m', 
               type=click.Choice(['gpt4-vision', 'gemini', 'llama-vision']), 
               help="Choose AI model for analysis")
-@click.option('--show-text', is_flag=True, help="Display the extracted text content")
+@click.option('--include-text', is_flag=True, help="Display the extracted text content")
 @click.option('--save-text', type=click.Path(), help="Save extracted text to a separate file")
-def process(file_path: str, ocr: bool, output: str, model: str, show_text: bool, save_text: str):
+def process(file_path: str, use_ocr: bool, output: str, model: str, include_text: bool, save_text: str):
     """Process a single document"""
     try:
         processor = DocumentProcessor(ai_model=model)
-        result = processor.process_document(file_path, use_ocr=ocr)
+        result = processor.process_document(file_path, use_ocr=use_ocr)
 
         # Create result table
         table = Table(title=f"Processing Results: {Path(file_path).name}")
@@ -59,7 +59,7 @@ def process(file_path: str, ocr: bool, output: str, model: str, show_text: bool,
         console.print(table)
 
         # Handle text content display/save options
-        if show_text:
+        if include_text:
             console.print("\nExtracted Text Content:", style="blue")
             console.print(result['text_content'])
 
@@ -67,6 +67,10 @@ def process(file_path: str, ocr: bool, output: str, model: str, show_text: bool,
             with open(save_text, 'w', encoding='utf-8') as f:
                 f.write(result['text_content'])
             console.print(f"\nText content saved to: {save_text}", style="blue")
+
+        # Remove text_content from JSON output if not requested
+        if not include_text and not save_text and 'text_content' in result:
+            del result['text_content']
 
         if output:
             import json
