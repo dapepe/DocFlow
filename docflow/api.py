@@ -71,28 +71,31 @@ async def get_available_models():
     response_description="Document metadata and classification results",
     tags=["Document Processing"])
 async def process_document(
-    file: UploadFile = File(..., description="The document file (PDF, DOCX, or TXT)"),
+    file: UploadFile = File(..., description="The document file (PDF, DOCX, TXT, JPG, JPEG, or PNG)"),
     use_ocr: bool = Form(default=False, description="Enable OCR processing for documents"),
     include_text: bool = Form(default=False, description="Include extracted text in response"),
-    model: AIModel = Form(default=AIModel.LLAVA, description="AI model to use for analysis")
+    convert_to_img: bool = Form(default=False, description="Convert document to image for vision model processing"),
+    model: AIModel = Form(default=AIModel.LLAMA, description="AI model to use for analysis")
 ):
     """
     Process a document and extract metadata.
 
     **Parameters:**
-    * file: The document file to process (PDF, DOCX, or TXT)
+    * file: The document file to process (PDF, DOCX, TXT, JPG, JPEG, or PNG)
     * use_ocr: Enable OCR processing for documents (default: false)
     * include_text: Include extracted text in response (default: false)
-    * model: AI model to use for analysis (default: llava)
+    * convert_to_img: Convert document to image for vision model processing (default: false)
+    * model: AI model to use for analysis (default: llama-vision)
 
     **Supported File Types:**
     * PDF
     * DOCX
     * TXT
+    * JPG/JPEG
+    * PNG
 
     **Available Models:**
-    * llava (default) - LLaVA via Ollama (requires installation)
-    * llama-vision - Llama 3.2 Vision via Ollama (requires installation)
+    * llama-vision (default) - Llama 3.2 Vision via Ollama (requires installation)
     * gpt4-vision - OpenAI's GPT-4 Vision API (requires OPENAI_API_KEY)
     * gemini - Google's Gemini Pro Vision (requires GOOGLE_API_KEY)
     * fallback - Basic text analysis without AI
@@ -121,7 +124,11 @@ async def process_document(
         try:
             # Initialize processor with selected model
             processor_instance = DocumentProcessor(ai_model=model.value)
-            result = processor_instance.process_document(temp_path, use_ocr)
+            result = processor_instance.process_document(
+                temp_path, 
+                use_ocr=use_ocr,
+                convert_to_img=convert_to_img
+            )
 
             # Remove text_content if not requested
             if not include_text and 'text_content' in result:

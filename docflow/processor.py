@@ -150,7 +150,7 @@ class DocumentProcessor:
         logger.debug(f"Final classification: {best_type} with score {max_score}")
         return best_type
 
-    def process_document(self, file_path: str, use_ocr: bool = False) -> Dict:
+    def process_document(self, file_path: str, use_ocr: bool = False, convert_to_img: bool = False) -> Dict:
         try:
             path = Path(file_path)
             if path.suffix.lower() not in self.supported_formats:
@@ -158,6 +158,10 @@ class DocumentProcessor:
 
             # Extract text and get image path if applicable
             text, image_path = self._extract_text(file_path)
+
+            # Convert to image if requested or needed for vision models
+            if convert_to_img and path.suffix.lower() == '.pdf':
+                image_path = self._process_pdf_for_vision(file_path)
 
             # Use AI model for enhanced extraction if available
             ai_analysis = None
@@ -183,7 +187,7 @@ class DocumentProcessor:
             }
 
             # Clean up temporary image file if created
-            if image_path and image_path != file_path:
+            if image_path and image_path != file_path and not convert_to_img:
                 try:
                     Path(image_path).unlink()
                 except Exception as e:
