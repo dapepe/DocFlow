@@ -31,10 +31,10 @@ class BaseAIModel(ABC):
         return True
 
 class LlamaVisionModel(BaseAIModel):
-    """Integration with Ollama via HTTP API"""
+    """Integration with Ollama via HTTP API for LLaVA model"""
 
     def __init__(self):
-        self.model_name = "llama-3.2-vision"
+        self.model_name = "llava"  # Using LLaVA model instead of llama
         self.base_url = os.getenv("OLLAMA_HOST", "http://localhost:11434")
         self._check_availability()
 
@@ -44,6 +44,12 @@ class LlamaVisionModel(BaseAIModel):
             response = requests.get(f"{self.base_url}/api/tags")
             if response.status_code != 200:
                 raise ModelNotAvailableError("Ollama service not available")
+
+            # Check if llava model is available
+            models = response.json().get('models', [])
+            if not any(m.get('name', '').startswith('llava') for m in models):
+                raise ModelNotAvailableError("LLaVA model not found in Ollama")
+
             logger.debug(f"Available Ollama models: {response.json()}")
         except Exception as e:
             logger.error(f"Error checking Ollama availability: {e}")
@@ -56,12 +62,23 @@ class LlamaVisionModel(BaseAIModel):
             Text content:
             {text}
 
-            Please extract and format the response as JSON with these fields:
-            1. document_type: The type of document (e.g., invoice, contract, report)
-            2. dates: List of important dates found
-            3. amounts: List of monetary amounts found
-            4. entities: List of names and organizations
-            5. key_fields: Map of key fields like invoice numbers, reference numbers, etc.
+            Please analyze this document and extract the following information in JSON format:
+            {{
+                "document_type": "The type of document (e.g., invoice, contract, report)",
+                "dates": ["List of all dates found in the document"],
+                "amounts": ["List of all monetary amounts"],
+                "invoice_number": "If this is an invoice, extract the invoice number",
+                "entities": {{
+                    "organizations": ["List of company names"],
+                    "people": ["List of person names"]
+                }},
+                "summary": "A brief summary of the document's purpose"
+            }}
+
+            For invoices, pay special attention to:
+            - Invoice numbers (usually prefixed with 'Invoice No:', 'Invoice #', etc.)
+            - Total amounts (look for 'Total:', 'Amount due:', etc.)
+            - Company details (both supplier and recipient)
             """
 
             payload = {
@@ -69,7 +86,8 @@ class LlamaVisionModel(BaseAIModel):
                 "prompt": prompt,
                 "stream": False,
                 "options": {
-                    "temperature": 0.2
+                    "temperature": 0.2,
+                    "stop": ["}"]  # Stop after JSON completion
                 }
             }
 
@@ -87,14 +105,28 @@ class LlamaVisionModel(BaseAIModel):
             if response.status_code != 200:
                 raise Exception(f"Ollama API error: {response.text}")
 
+            # Try to parse response as JSON
+            try:
+                text_response = response.json().get("response", "")
+                # Find the JSON object in the response
+                json_start = text_response.find("{")
+                json_end = text_response.rfind("}") + 1
+                if json_start >= 0 and json_end > json_start:
+                    json_str = text_response[json_start:json_end]
+                    result = json.loads(json_str)
+                else:
+                    result = {"text": text_response}
+            except json.JSONDecodeError:
+                result = {"text": text_response}
+
             return {
-                "raw_analysis": response.json().get("response", ""),
+                "raw_analysis": result,
                 "model_name": self.model_name,
                 "success": True
             }
 
         except Exception as e:
-            logger.error(f"Error in Llama Vision extraction: {e}")
+            logger.error(f"Error in LLaVA extraction: {e}")
             return {
                 "success": False,
                 "error": str(e),
@@ -105,7 +137,7 @@ class GPT4VisionModel(BaseAIModel):
     """Integration with OpenAI's GPT-4 Vision API"""
 
     def __init__(self):
-        self.model_name = "gpt-4-vision"  
+        self.model_name = "gpt-4-turbo"  
         self._init_client()
 
     @classmethod
@@ -133,7 +165,7 @@ class GPT4VisionModel(BaseAIModel):
                 {
                     "role": "system",
                     "content": ("You are a document analysis expert. Extract key information from "
-                              "documents and format the output as JSON.")
+                                  "documents and format the output as JSON.")
                 },
                 {
                     "role": "user",
@@ -308,7 +340,7 @@ class FallbackModel(BaseAIModel):
 def get_available_models() -> Dict[str, str]:
     """Return a dictionary of available models and their descriptions"""
     models = {
-        "llama-vision": "Llama 3.2 Vision via Ollama (default)",
+        "llama-vision": "LLaVA Vision via Ollama (local AI model)",
         "gpt4-vision": "OpenAI's GPT-4 Vision API",
         "gemini": "Google's Gemini Pro Vision",
         "fallback": "Basic text analysis without AI"
