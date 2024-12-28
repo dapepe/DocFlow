@@ -20,6 +20,47 @@ DocFlow is a powerful document processing tool that supports PDF, DOCX, and TXT 
 
 ### Run locally with Python
 
+1. Install system dependencies:
+
+**MacOS**
+
+```bash
+brew install poppler
+```
+
+**Windows**
+
+```bash
+choco install poppler
+```
+
+**Linux**
+
+```bash
+sudo apt-get install poppler-utils
+```
+
+
+2. Clone the repository and install Python dependencies:
+
+```bash
+git clone https://github.com/your-repo/docflow.git
+cd docflow
+```
+
+3. I nstall Python dependencies:
+
+```bash
+pip install -r requirements.txt
+```  
+
+4. Run the project:
+
+```bash
+./serve.sh # To start the API server
+./process.sh path/to/document.pdf --ocr # To process a document
+```
+
 ### Run with Docker
 
 Running with Docker:

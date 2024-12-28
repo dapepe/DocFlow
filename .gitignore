@@ -1,4 +1,3 @@
-
 # Logs
 *.log
 docflow.log
@@ -49,3 +48,6 @@ temp/
 .breakpoints
 .pythonlibs/
 uv.lock
+
+# Environment
+.env

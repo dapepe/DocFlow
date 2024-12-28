@@ -36,8 +36,10 @@ class LlamaVisionModel(BaseAIModel):
     def __init__(self, model_variant="llava"):
         # Allow selecting between llava and llama-3.2-vision
         self.model_variant = model_variant
-        self.model_name = "llava" if model_variant == "llava" else "llama-3.2-vision"
+        self.model_name = "llava" if model_variant == "llava" else "llama3.2-vision"
         self.base_url = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+        # Get timeout from environment variable or use default of 40 seconds
+        self.timeout = int(os.getenv("OLLAMA_TIMEOUT", "40"))
         try:
             self._check_availability()
         except Exception as e:
@@ -50,8 +52,8 @@ class LlamaVisionModel(BaseAIModel):
     def _check_availability(self):
         """Check if Ollama service and selected model is available"""
         try:
-            # Add timeout to prevent hanging
-            response = requests.get(f"{self.base_url}/api/tags", timeout=5)
+            # Use configured timeout
+            response = requests.get(f"{self.base_url}/api/tags", timeout=self.timeout)
             if response.status_code != 200:
                 raise ModelNotAvailableError(
                     f"Ollama service returned status code: {response.status_code}"
@@ -72,6 +74,11 @@ class LlamaVisionModel(BaseAIModel):
             raise ModelNotAvailableError(
                 "Cannot connect to Ollama service. Please ensure Ollama is installed and running "
                 "on http://localhost:11434 or set OLLAMA_HOST environment variable."
+            )
+        except requests.exceptions.Timeout as e:
+            raise ModelNotAvailableError(
+                f"Ollama service timeout after {self.timeout} seconds. "
+                "Adjust OLLAMA_TIMEOUT in environment variables if needed."
             )
         except Exception as e:
             logger.error(f"Error checking Ollama availability: {e}")
@@ -121,7 +128,7 @@ class LlamaVisionModel(BaseAIModel):
             response = requests.post(
                 f"{self.base_url}/api/generate",
                 json=payload,
-                timeout=30
+                timeout=60
             )
 
             if response.status_code != 200:
