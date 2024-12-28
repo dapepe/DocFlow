@@ -51,3 +51,6 @@ uv.lock
 
 # Environment
 .env
+
+# Test files
+test.*
