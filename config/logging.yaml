@@ -5,27 +5,27 @@ formatters:
 handlers:
   console:
     class: logging.StreamHandler
-    level: DEBUG
+    level: ERROR  # Always show errors
     formatter: standard
     stream: ext://sys.stdout
   file:
     class: logging.FileHandler
-    level: DEBUG
+    level: DEBUG  # Always capture all logs in file
     formatter: standard
     filename: docflow.log
 loggers:
   docflow:
-    level: INFO
+    level: ERROR  # Base level, will be updated to DEBUG with --verbose
     handlers: [console, file]
     propagate: no
   docflow.processor:
-    level: INFO
+    level: ERROR  # Base level, will be updated to DEBUG with --verbose
     handlers: [console, file]
     propagate: no
   docflow.models:
-    level: INFO
+    level: ERROR  # Base level, will be updated to DEBUG with --verbose
     handlers: [console, file]
     propagate: no
 root:
-  level: INFO
+  level: ERROR  # Only show errors by default
   handlers: [console]
