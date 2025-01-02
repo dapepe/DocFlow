@@ -90,54 +90,48 @@ async def process_document(
 ):
     """Process a document and extract metadata"""
     try:
-        # Get all available models
+        # Validate and get the requested model
         available_models = ModelRegistry.list_models()
-        if not available_models:
-            logger.warning("No models available, falling back to fallback model")
-            model = "fallback"
+        if model not in available_models:
+            logger.warning(f"Requested model '{model}' not found in available models: {list(available_models.keys())}")
+            raise HTTPException(
+                status_code=400,
+                detail=f"Model '{model}' is not available. Available models: {list(available_models.keys())}"
+            )
 
         # Try to get requested model
         model_class = ModelRegistry.get_model(model)
         if not model_class:
-            logger.warning(f"Model {model} not found, falling back to fallback model")
-            model_class = ModelRegistry.get_model("fallback")
-            if not model_class:
-                raise HTTPException(
-                    status_code=500,
-                    detail="Fallback model initialization failed"
-                )
+            logger.error(f"Failed to get model class for '{model}'")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to initialize model '{model}'"
+            )
 
-        # Check model availability
+        # Check model availability before processing
         try:
             if not model_class.is_available():
-                logger.warning(f"Model {model} is not available, falling back to fallback model")
-                model_class = ModelRegistry.get_model("fallback")
-                if not model_class or not model_class.is_available():
-                    raise HTTPException(
-                        status_code=500,
-                        detail="No available models found, including fallback"
-                    )
-        except Exception as e:
-            logger.error(f"Error checking model availability: {e}")
-            model_class = ModelRegistry.get_model("fallback")
-            if not model_class or not model_class.is_available():
+                logger.error(f"Model '{model}' is not available")
                 raise HTTPException(
-                    status_code=500,
-                    detail=f"Model availability check failed and fallback model is not available: {str(e)}"
+                    status_code=503,
+                    detail=f"Model '{model}' is currently not available"
                 )
+        except Exception as e:
+            logger.error(f"Error checking availability for model '{model}': {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error checking model availability: {str(e)}"
+            )
 
-        # Create model instance with proper error handling
+        # Create model instance
         try:
             model_instance = model_class()
         except Exception as e:
-            logger.error(f"Error creating model instance: {e}")
-            model_class = ModelRegistry.get_model("fallback")
-            if not model_class:
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Model initialization failed and fallback model is not available: {str(e)}"
-                )
-            model_instance = model_class()
+            logger.error(f"Error creating instance of model '{model}': {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to initialize model '{model}': {str(e)}"
+            )
 
         # Process document
         with tempfile.NamedTemporaryFile(delete=False) as temp_file:
@@ -155,18 +149,12 @@ async def process_document(
                     result.pop('text_content', None)
 
                 if not result.get('success', False):
-                    logger.warning(f"Model processing failed: {result.get('error', 'Unknown error')}")
-                    # Try fallback model if primary model fails
-                    fallback_model = ModelRegistry.get_model("fallback")()
-                    result = fallback_model.extract_information(
-                        text="",
-                        image_path=temp_path if convert_to_img else None
+                    error_msg = result.get('error', 'Unknown error')
+                    logger.error(f"Model processing failed: {error_msg}")
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Model processing failed: {error_msg}"
                     )
-                    if not result.get('success', False):
-                        raise HTTPException(
-                            status_code=500,
-                            detail=f"Both primary and fallback model processing failed: {result.get('error', 'Unknown error')}"
-                        )
 
                 return JSONResponse(content=result)
             finally:
