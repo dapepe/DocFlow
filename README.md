@@ -1,26 +1,37 @@
 # DocFlow Document Processor
 
-DocFlow is a powerful document processing tool that supports PDF, DOCX, and TXT files with features for metadata extraction, document classification, and OCR capabilities.
+DocFlow is an advanced document processing system that supports PDF, DOCX, and TXT files with AI-powered features for metadata extraction, document classification, and OCR capabilities.
 
 ## Features
 
-- Document classification based on content
+- AI-powered document classification using multiple model providers
 - Metadata extraction (dates, amounts, invoice numbers, etc.)
 - OCR support for PDF files
 - REST API with FastAPI
 - Command-line interface
 - Rich console output
+- Multiple AI model support:
+  - GPT-4 Vision
+  - Grok Vision
+  - LLaVA
+  - Llama Vision
+  - Fallback model for offline use
+- Configurable model selection and fallback behavior
 
 ## Requirements
 
 - Python 3.11+
 - Dependencies are listed in requirements.txt and will be installed automatically when you run the project
+- For AI models:
+  - OpenAI API key for GPT-4 Vision
+  - xAI API key for Grok Vision
+  - Ollama server for LLaVA and Llama Vision
 
 ## Getting started
 
 ### Run locally with Python
 
-1. Install system dependencies:
+1. Install system dependencies and configure AI models:
 
 **MacOS**
 
@@ -54,7 +65,27 @@ cd docflow
 pip install -r requirements.txt
 ```  
 
-4. Run the project:
+4. Configure your AI models in config/models.yaml:
+
+```yaml
+default_model: gpt4-vision
+fallback_model: llama-vision
+models:
+  gpt4-vision:
+    enabled: true
+    api_key: your_openai_key
+  grok-vision:
+    enabled: true
+    api_key: your_xai_key
+  llama-vision:
+    enabled: true
+    ollama_url: http://localhost:11434
+  llava:
+    enabled: true
+    ollama_url: http://localhost:11434
+```
+
+5. Run the project:
 
 ```bash
 ./serve.sh # To start the API server
