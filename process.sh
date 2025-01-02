@@ -2,10 +2,7 @@
 
 # Load environment variables from .env file
 if [ -f .env ]; then
-    echo "Loading environment variables from .env file..."
-    set -a
-    source <(sed -e '/^#/d;/^\s*$/d' .env)
-    set +a
+    export $(grep -v '^#' .env | sed '/^$/d' | sed 's/ *#.*//' | xargs)
 else
     echo "Warning: .env file not found. Using default configuration."
 fi
