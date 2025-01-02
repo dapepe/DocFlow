@@ -6,6 +6,7 @@ import tempfile
 import os
 from pathlib import Path
 from .models import ModelRegistry
+from .processor import DocumentProcessor
 import logging
 from typing import List
 
@@ -34,15 +35,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class AIModel(str, Enum):
-    """Dynamic Enum for available AI models"""
-    def __new__(cls):
-        values = list(ModelRegistry.list_models().keys())
-        # Ensure fallback is always available
-        if "fallback" not in values:
-            values.append("fallback")
-        return str.__new__(cls, values[0])
-
 @app.get("/")
 async def root():
     """Welcome to DocFlow API"""
@@ -63,7 +55,6 @@ async def get_available_models():
         available_models = ModelRegistry.list_models()
         if not available_models:
             logger.warning("No models available, ensuring fallback model is registered")
-            # If no models are available, ensure at least fallback is available
             fallback_model = ModelRegistry.get_model("fallback")
             if fallback_model:
                 available_models = {"fallback": fallback_model.description}
@@ -99,69 +90,56 @@ async def process_document(
                 detail=f"Model '{model}' is not available. Available models: {list(available_models.keys())}"
             )
 
-        # Try to get requested model
-        model_class = ModelRegistry.get_model(model)
-        if not model_class:
-            logger.error(f"Failed to get model class for '{model}'")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to initialize model '{model}'"
-            )
-
-        # Check model availability before processing
-        try:
-            if not model_class.is_available():
-                logger.error(f"Model '{model}' is not available")
-                raise HTTPException(
-                    status_code=503,
-                    detail=f"Model '{model}' is currently not available"
-                )
-        except Exception as e:
-            logger.error(f"Error checking availability for model '{model}': {e}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Error checking model availability: {str(e)}"
-            )
-
-        # Create model instance
-        try:
-            model_instance = model_class()
-        except Exception as e:
-            logger.error(f"Error creating instance of model '{model}': {e}")
-            raise HTTPException(
-                status_code=500,
-                detail=f"Failed to initialize model '{model}': {str(e)}"
-            )
-
-        # Process document
-        with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+        # Save uploaded file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as temp_file:
             content = await file.read()
             temp_file.write(content)
             temp_path = temp_file.name
 
             try:
-                result = model_instance.extract_information(
-                    text="",  # Text extraction will be handled by the processor
-                    image_path=temp_path if convert_to_img else None
+                # Initialize document processor with specified model
+                processor = DocumentProcessor(ai_model=model)
+
+                # Process the document
+                result = processor.process_document(
+                    file_path=temp_path,
+                    use_ocr=use_ocr,
+                    convert_to_img=convert_to_img
                 )
 
+                # Remove text content if not requested
                 if not include_text:
                     result.pop('text_content', None)
 
-                if not result.get('success', False):
-                    error_msg = result.get('error', 'Unknown error')
-                    logger.error(f"Model processing failed: {error_msg}")
+                # Check for processing success
+                ai_analysis = result.get('ai_analysis', {})
+                if not ai_analysis.get('success', False):
+                    error_msg = ai_analysis.get('error', 'Unknown error in AI processing')
+                    logger.error(f"AI processing failed: {error_msg}")
                     raise HTTPException(
                         status_code=500,
-                        detail=f"Model processing failed: {error_msg}"
+                        detail=f"Document processing failed: {error_msg}"
                     )
 
                 return JSONResponse(content=result)
+
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.error(f"Error processing document: {e}", exc_info=True)
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Error processing document: {str(e)}"
+                )
             finally:
-                os.unlink(temp_path)
+                # Clean up temporary file
+                try:
+                    os.unlink(temp_path)
+                except Exception as e:
+                    logger.warning(f"Failed to clean up temporary file {temp_path}: {e}")
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error processing document: {e}", exc_info=True)
+        logger.error(f"Unexpected error in process_document: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

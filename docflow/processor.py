@@ -156,6 +156,7 @@ class DocumentProcessor:
 
             # Extract text and get image path if applicable
             text, image_path = self._extract_text(file_path)
+            logger.debug(f"Extracted text length: {len(text)}, image path: {image_path}")
 
             # Convert to image if requested or needed for vision models
             if convert_to_img and path.suffix.lower() == '.pdf':
@@ -163,8 +164,9 @@ class DocumentProcessor:
                 # Only use the converted image if we don't already have one
                 if not image_path:
                     image_path = temp_image_path
+                    logger.debug(f"Created image from PDF: {image_path}")
 
-            # Use AI model for enhanced extraction if available
+            # Use AI model for enhanced extraction
             ai_analysis = None
             try:
                 logger.info(f"Processing with AI model: {self.ai_model.__class__.__name__}")
