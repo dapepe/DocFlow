@@ -41,9 +41,15 @@ class ModelRegistry:
             try:
                 # Log environment variables for debugging
                 if hasattr(model_class, 'requires_env_vars'):
-                    env_vars = {var: bool(os.getenv(var)) for var in model_class.requires_env_vars}
+                    env_vars = {var: bool(os.getenv(var)) for var in getattr(model_class, 'requires_env_vars', [])}
                     logger.debug(f"Model {model_id} environment variables: {env_vars}")
 
+                # Always include fallback model
+                if model_id == 'fallback':
+                    models[model_id] = getattr(model_class, 'description', 'Basic text analysis without AI')
+                    continue
+
+                # Check availability for other models
                 is_available = model_class.is_available()
                 logger.debug(f"Model {model_id} availability check: {is_available}")
 
@@ -60,9 +66,13 @@ class BaseModel(ABC):
     requires_env_vars: list = []
 
     @classmethod
-    @abstractmethod
     def is_available(cls) -> bool:
         """Check if the model is available in the current environment"""
+        # Fallback model is always available
+        if cls.__name__ == 'FallbackModel':
+            return True
+
+        # Check environment variables
         env_vars_present = all(bool(os.getenv(var)) for var in cls.requires_env_vars)
         if not env_vars_present:
             missing_vars = [var for var in cls.requires_env_vars if not os.getenv(var)]
