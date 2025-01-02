@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional
 from . import BaseModel
 import logging
 from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.retry import Retry
+from urllib3.util import Retry  # Updated import to fix the LSP issue
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +85,9 @@ class OllamaBaseModel(BaseModel):
             host = os.getenv('OLLAMA_HOST', cls.DEFAULT_CONFIG['host'])
             logger.debug(f"Checking Ollama availability at {host}")
 
-            response = requests.get(f"{host}/api/tags")
+            session = requests.Session()
+            response = session.get(f"{host}/api/tags", timeout=5)  # Added timeout
+
             if response.status_code == 200:
                 models = response.json().get('models', [])
                 required_model = cls._get_model_name()
@@ -113,6 +115,10 @@ class OllamaBaseModel(BaseModel):
     def _make_ollama_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Make a request to Ollama API with proper error handling"""
         try:
+            # Verify service availability before making request
+            if not self.is_available():
+                raise Exception(f"Ollama service or model {self.model} is not available")
+
             # Add default options if not present
             if 'options' not in payload:
                 payload['options'] = {}
@@ -127,6 +133,9 @@ class OllamaBaseModel(BaseModel):
             )
             response.raise_for_status()
             return response.json()
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Ollama request failed: {e}")
+            raise Exception(f"Failed to communicate with Ollama service: {str(e)}")
         except Exception as e:
             logger.error(f"Error in Ollama request: {e}")
             raise
