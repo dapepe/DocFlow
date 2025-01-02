@@ -8,6 +8,7 @@ from openai import OpenAI
 import base64
 from . import BaseModel, ModelRegistry
 import logging
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +16,7 @@ class GrokVisionModel(BaseModel):
     """Grok Vision model using xAI's API for document analysis"""
     description = "Grok Vision model for advanced document analysis"
     requires_env_vars = ['XAI_API_KEY']
-    
+
     def __init__(self):
         """Initialize the model with configuration from environment"""
         self.api_key = os.getenv('XAI_API_KEY')
@@ -28,26 +29,28 @@ class GrokVisionModel(BaseModel):
             3. Monetary amounts
             4. Key entities (people, companies)
             5. Important details specific to the document type
-            
+
             Provide the analysis in a structured JSON format.
             """)
-    
+
     @classmethod
     def is_available(cls) -> bool:
         """Check if xAI API key is configured"""
-        return bool(os.getenv('XAI_API_KEY'))
-    
+        api_key = os.getenv('XAI_API_KEY')
+        logger.debug(f"Checking GrokVision availability: API key {'present' if api_key else 'missing'}")
+        return bool(api_key)
+
     def extract_information(self, text: str, image_path: Optional[str] = None) -> Dict[str, Any]:
         """Extract information using Grok Vision model"""
         try:
             messages = []
-            
+
             # Add system prompt
             messages.append({
                 "role": "system",
                 "content": "You are a document analysis expert. Analyze the provided document and extract key information in a structured format."
             })
-            
+
             # Add image if available
             if image_path:
                 with open(image_path, "rb") as image_file:
@@ -73,7 +76,7 @@ class GrokVisionModel(BaseModel):
                     "role": "user",
                     "content": f"{self.prompt_template}\n\nText to analyze:\n{text}"
                 })
-            
+
             # Make request to xAI API
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -81,15 +84,15 @@ class GrokVisionModel(BaseModel):
                 response_format={"type": "json_object"},
                 max_tokens=1000
             )
-            
-            analysis = response.choices[0].message.content
-            
+
+            analysis = json.loads(response.choices[0].message.content)
+
             return {
                 "raw_analysis": analysis,
                 "model_name": self.model,
                 "success": True
             }
-            
+
         except Exception as e:
             logger.error(f"Error in Grok Vision analysis: {e}")
             return {
