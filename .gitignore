@@ -54,3 +54,4 @@ uv.lock
 
 # Test files
 test.*
+.aider*
