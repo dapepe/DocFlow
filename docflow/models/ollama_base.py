@@ -3,7 +3,6 @@ Base Ollama Model Implementation
 Provides shared functionality for Ollama-based models
 """
 import os
-import json
 import requests
 from typing import Dict, Any, Optional
 from . import BaseModel
@@ -20,16 +19,6 @@ class OllamaBaseModel(BaseModel):
         """Initialize the model with configuration from environment"""
         self.host = os.getenv('OLLAMA_HOST', 'http://localhost:11434')
         self.model = self._get_model_name()
-        self.prompt_template = os.getenv('OLLAMA_PROMPT_TEMPLATE', 
-            """Analyze this document and extract key information:
-            1. Document type/category
-            2. Important dates
-            3. Monetary amounts
-            4. Key entities (people, companies)
-            5. Important details specific to the document type
-
-            Provide the analysis in a structured format.
-            """)
         logger.debug(f"Initialized Ollama model with host={self.host}, model={self.model}")
 
     @classmethod
@@ -70,51 +59,13 @@ class OllamaBaseModel(BaseModel):
             logger.error(f"Unexpected error checking Ollama availability: {e}")
             return False
 
-    def extract_information(self, text: str, image_path: Optional[str] = None) -> Dict[str, Any]:
-        """Extract information using Ollama model"""
+    def _make_ollama_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Make a request to Ollama API with proper error handling"""
         try:
-            # Prepare the request payload
-            payload = {
-                "model": self.model,
-                "prompt": self.prompt_template,
-                "stream": False
-            }
-
-            # Add image if available
-            if image_path:
-                import base64
-                with open(image_path, "rb") as image_file:
-                    image_data = base64.b64encode(image_file.read()).decode('utf-8')
-                    payload["images"] = [image_data]
-
-            # Add text context
-            if text:
-                payload["context"] = text
-
             logger.debug(f"Making request to Ollama API at {self.host}")
             response = requests.post(f"{self.host}/api/generate", json=payload)
             response.raise_for_status()
-
-            # Parse response
-            result = response.json()
-            analysis = result.get('response', '')
-
-            # Try to extract structured information from the response
-            try:
-                structured_data = json.loads(analysis)
-            except json.JSONDecodeError:
-                structured_data = {"raw_text": analysis}
-
-            return {
-                "raw_analysis": structured_data,
-                "model_name": self.model,
-                "success": True
-            }
-
+            return response.json()
         except Exception as e:
-            logger.error(f"Error in Ollama analysis: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-                "model_name": self.model
-            }
+            logger.error(f"Error in Ollama request: {e}")
+            raise

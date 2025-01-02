@@ -6,7 +6,7 @@ from .ollama_base import OllamaBaseModel
 from . import ModelRegistry
 import os
 import json
-import requests
+import base64
 from typing import Dict, Any, Optional
 import logging
 
@@ -15,28 +15,83 @@ logger = logging.getLogger(__name__)
 class LlamaVisionModel(OllamaBaseModel):
     """Llama Vision model using Ollama for document analysis"""
     description = "Llama Vision model for advanced document analysis"
-    requires_env_vars = []  # No required env vars since we have defaults
+
+    # Document analysis schema
+    ANALYSIS_SCHEMA = {
+        "document_type": "Type of document (invoice, contract, report, etc.)",
+        "dates": ["List of important dates found"],
+        "amounts": ["List of monetary amounts"],
+        "entities": {
+            "organizations": ["Company names"],
+            "people": ["Person names"]
+        },
+        "metadata": {
+            "invoice_number": "Document reference number if present",
+            "total_amount": "Total amount if present",
+            "due_date": "Payment due date if present"
+        }
+    }
 
     @classmethod
     def _get_model_name(cls) -> str:
         """Get the Llama Vision model name"""
         return os.getenv('OLLAMA_LLAMA_VISION_MODEL', 'llama3.2-vision:latest')
 
-    def __init__(self):
-        """Initialize the model with configuration from environment"""
-        self.host = os.getenv('OLLAMA_HOST', 'http://localhost:11434')
-        self.model = self._get_model_name()
-        self.prompt_template = os.getenv('OLLAMA_PROMPT_TEMPLATE', 
-            """Analyze this document and extract key information:
-            1. Document type/category
-            2. Important dates
-            3. Monetary amounts
-            4. Key entities (people, companies)
-            5. Important details specific to the document type
+    def _get_prompt_template(self, text: str) -> str:
+        """Get the prompt template for document analysis"""
+        return f"""As a document analysis expert, analyze this document and extract key information in JSON format.
 
-            Provide the analysis in a structured format.
-            """)
-        logger.debug(f"Initialized LlamaVision with host={self.host}, model={self.model}")
+        Please structure your response according to this schema:
+        {json.dumps(self.ANALYSIS_SCHEMA, indent=2)}
+
+        Document content to analyze:
+        {text}
+
+        Provide ONLY the JSON response, no additional text.
+        """
+
+    def extract_information(self, text: str, image_path: Optional[str] = None) -> Dict[str, Any]:
+        """Extract information using Llama Vision model"""
+        try:
+            # Prepare the request payload
+            payload = {
+                "model": self.model,
+                "prompt": self._get_prompt_template(text),
+                "stream": False,
+                "options": {
+                    "temperature": 0.2
+                }
+            }
+
+            # Add image if available
+            if image_path:
+                with open(image_path, "rb") as image_file:
+                    image_data = base64.b64encode(image_file.read()).decode('utf-8')
+                    payload["images"] = [image_data]
+
+            # Make request to Ollama API
+            result = self._make_ollama_request(payload)
+            analysis = result.get('response', '')
+
+            # Try to extract structured information from the response
+            try:
+                structured_data = json.loads(analysis)
+            except json.JSONDecodeError:
+                structured_data = {"raw_text": analysis}
+
+            return {
+                "raw_analysis": structured_data,
+                "model_name": self.model,
+                "success": True
+            }
+
+        except Exception as e:
+            logger.error(f"Error in Llama Vision analysis: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "model_name": self.model
+            }
 
     @classmethod
     def is_available(cls) -> bool:
@@ -67,55 +122,5 @@ class LlamaVisionModel(OllamaBaseModel):
             logger.error(f"Unexpected error checking Ollama availability: {e}")
             return False
 
-    def extract_information(self, text: str, image_path: Optional[str] = None) -> Dict[str, Any]:
-        """Extract information using Llama Vision model"""
-        try:
-            # Prepare the request payload
-            payload = {
-                "model": self.model,
-                "prompt": self.prompt_template,
-                "stream": False
-            }
-
-            # Add image if available
-            if image_path:
-                import base64
-                with open(image_path, "rb") as image_file:
-                    image_data = base64.b64encode(image_file.read()).decode('utf-8')
-                    payload["images"] = [image_data]
-
-            # Add text context
-            if text:
-                payload["context"] = text
-
-            logger.debug(f"Making request to Ollama API at {self.host}")
-            response = requests.post(f"{self.host}/api/generate", json=payload)
-            response.raise_for_status()
-
-            # Parse response
-            result = response.json()
-            analysis = result.get('response', '')
-
-            # Try to extract structured information from the response
-            try:
-                structured_data = json.loads(analysis)
-            except json.JSONDecodeError:
-                structured_data = {"raw_text": analysis}
-
-            return {
-                "raw_analysis": structured_data,
-                "model_name": self.model,
-                "success": True
-            }
-
-        except Exception as e:
-            logger.error(f"Error in Llama Vision analysis: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-                "model_name": self.model
-            }
-
 # Register the Llama Vision model
 ModelRegistry.register("llama-vision", LlamaVisionModel)
-ModelRegistry.register("llava", LlamaVisionModel)  # Register LLaVA as an alias
