@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class LlamaVisionModel(BaseModel):
     """Llama Vision model using Ollama for document analysis"""
     description = "Llama Vision model (requires Ollama installation)"
-    requires_env_vars = ['OLLAMA_HOST', 'OLLAMA_MODEL']
+    requires_env_vars = ['OLLAMA_HOST']  # Only require host, model has default
 
     def __init__(self):
         """Initialize the model with configuration from environment"""
@@ -30,22 +30,40 @@ class LlamaVisionModel(BaseModel):
 
             Provide the analysis in a structured format.
             """)
+        logger.debug(f"Initialized LlamaVision with host={self.host}, model={self.model}")
 
     @classmethod
     def is_available(cls) -> bool:
         """Check if Ollama service is available and model is installed"""
         try:
+            # First check if required environment variables are set
+            if not super().is_available():
+                logger.debug("LlamaVision environment variables not configured")
+                return False
+
+            # Then check if Ollama service is responding
             host = os.getenv('OLLAMA_HOST', 'http://localhost:11434')
+            logger.debug(f"Checking Ollama availability at {host}")
+
             response = requests.get(f"{host}/api/tags")
             if response.status_code == 200:
                 models = response.json().get('models', [])
                 required_model = os.getenv('OLLAMA_MODEL', 'llama-3.2-vision')
-                logger.debug(f"Checking Llama Vision availability: Found models: {[m['name'] for m in models]}")
-                return any(m['name'] == required_model for m in models)
-            logger.debug("Ollama service not responding correctly")
+                available_models = [m.get('name', '') for m in models]
+                logger.debug(f"Found Ollama models: {available_models}")
+
+                is_model_available = required_model in available_models
+                logger.debug(f"Required model {required_model} availability: {is_model_available}")
+                return is_model_available
+
+            logger.warning(f"Ollama service returned status code: {response.status_code}")
+            return False
+
+        except requests.exceptions.ConnectionError as e:
+            logger.debug(f"Ollama service connection failed: {e}")
             return False
         except Exception as e:
-            logger.debug(f"Ollama service not available: {e}")
+            logger.error(f"Unexpected error checking Ollama availability: {e}")
             return False
 
     def extract_information(self, text: str, image_path: Optional[str] = None) -> Dict[str, Any]:
@@ -69,7 +87,7 @@ class LlamaVisionModel(BaseModel):
             if text:
                 payload["context"] = text
 
-            # Make request to Ollama API
+            logger.debug(f"Making request to Ollama API at {self.host}")
             response = requests.post(f"{self.host}/api/generate", json=payload)
             response.raise_for_status()
 
@@ -79,10 +97,8 @@ class LlamaVisionModel(BaseModel):
 
             # Try to extract structured information from the response
             try:
-                # Attempt to parse if response is JSON
                 structured_data = json.loads(analysis)
             except json.JSONDecodeError:
-                # If not JSON, provide as raw text
                 structured_data = {"raw_text": analysis}
 
             return {
@@ -99,6 +115,6 @@ class LlamaVisionModel(BaseModel):
                 "model_name": self.model
             }
 
-# Register Llama Vision models
+# Register both model variants
 ModelRegistry.register("llama-vision", LlamaVisionModel)
 ModelRegistry.register("llava", LlamaVisionModel)  # Register LLaVA as an alias

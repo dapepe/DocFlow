@@ -25,21 +25,33 @@ class ModelRegistry:
     @classmethod
     def get_model(cls, model_id: str) -> Optional[Type['BaseModel']]:
         """Get a model class by its ID"""
-        return cls._models.get(model_id)
+        model = cls._models.get(model_id)
+        if model:
+            logger.debug(f"Retrieved model {model_id} from registry")
+        else:
+            logger.warning(f"Model {model_id} not found in registry")
+        return model
 
     @classmethod
     def list_models(cls) -> Dict[str, str]:
         """List all registered models and their descriptions"""
         models = {}
+        logger.debug(f"Checking availability for {len(cls._models)} registered models")
         for model_id, model_class in cls._models.items():
             try:
-                if model_class.is_available():
-                    models[model_id] = model_class.description
-                    logger.debug(f"Model {model_id} is available")
-                else:
-                    logger.debug(f"Model {model_id} is not available")
+                # Log environment variables for debugging
+                if hasattr(model_class, 'requires_env_vars'):
+                    env_vars = {var: bool(os.getenv(var)) for var in model_class.requires_env_vars}
+                    logger.debug(f"Model {model_id} environment variables: {env_vars}")
+
+                is_available = model_class.is_available()
+                logger.debug(f"Model {model_id} availability check: {is_available}")
+
+                if is_available:
+                    models[model_id] = getattr(model_class, 'description', 'No description available')
+                    logger.info(f"Model {model_id} is available")
             except Exception as e:
-                logger.error(f"Error checking availability for model {model_id}: {e}")
+                logger.error(f"Error checking availability for model {model_id}: {e}", exc_info=True)
         return models
 
 class BaseModel(ABC):
@@ -51,7 +63,11 @@ class BaseModel(ABC):
     @abstractmethod
     def is_available(cls) -> bool:
         """Check if the model is available in the current environment"""
-        return all(bool(os.getenv(var)) for var in cls.requires_env_vars)
+        env_vars_present = all(bool(os.getenv(var)) for var in cls.requires_env_vars)
+        if not env_vars_present:
+            missing_vars = [var for var in cls.requires_env_vars if not os.getenv(var)]
+            logger.debug(f"Missing required environment variables for {cls.__name__}: {missing_vars}")
+        return env_vars_present
 
     @abstractmethod
     def extract_information(self, text: str, image_path: Optional[str] = None) -> Dict[str, Any]:
@@ -65,14 +81,15 @@ BaseAIModel = BaseModel
 def load_models():
     """Dynamically load all model implementations"""
     models_dir = Path(__file__).parent
+    logger.info(f"Loading models from directory: {models_dir}")
     for model_file in models_dir.glob("*.py"):
-        if model_file.stem not in ["__init__", "base", "grok_vision"]:  # Exclude grok_vision
+        if model_file.stem not in ["__init__", "base"]:
             module_name = f"{__package__}.{model_file.stem}"
             try:
                 importlib.import_module(module_name)
-                logger.debug(f"Loaded model module: {module_name}")
+                logger.info(f"Successfully loaded model module: {module_name}")
             except Exception as e:
-                logger.error(f"Error loading model {module_name}: {e}")
+                logger.error(f"Error loading model {module_name}: {e}", exc_info=True)
 
 # Load models on package initialization
 load_models()
