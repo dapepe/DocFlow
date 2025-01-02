@@ -9,6 +9,7 @@ import json
 import base64
 from typing import Dict, Any, Optional
 import logging
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -92,35 +93,6 @@ class LlamaVisionModel(OllamaBaseModel):
                 "error": str(e),
                 "model_name": self.model
             }
-
-    @classmethod
-    def is_available(cls) -> bool:
-        """Check if Ollama service is available and model is installed"""
-        try:
-            # Check if Ollama service is responding
-            host = os.getenv('OLLAMA_HOST', 'http://localhost:11434')
-            logger.debug(f"Checking Ollama availability at {host}")
-
-            response = requests.get(f"{host}/api/tags")
-            if response.status_code == 200:
-                models = response.json().get('models', [])
-                required_model = cls._get_model_name()
-                available_models = [m.get('name', '') for m in models]
-                logger.debug(f"Found Ollama models: {available_models}")
-
-                is_model_available = required_model in available_models
-                logger.debug(f"Required model {required_model} availability: {is_model_available}")
-                return is_model_available
-
-            logger.warning(f"Ollama service returned status code: {response.status_code}")
-            return False
-
-        except requests.exceptions.ConnectionError as e:
-            logger.debug(f"Ollama service connection failed: {e}")
-            return False
-        except Exception as e:
-            logger.error(f"Unexpected error checking Ollama availability: {e}")
-            return False
 
 # Register the Llama Vision model
 ModelRegistry.register("llama-vision", LlamaVisionModel)
