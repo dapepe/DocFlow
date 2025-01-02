@@ -1,11 +1,8 @@
 import yaml
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Union
-from .models import (
-    BaseAIModel, LlamaVisionModel, GPT4VisionModel, 
-    GeminiModel, FallbackModel, ModelNotAvailableError,
-    get_available_models
-)
+from .models import BaseModel as BaseAIModel  # Alias for backward compatibility
+from .models import ModelRegistry
 import logging
 import re
 from typing import BinaryIO
@@ -27,7 +24,7 @@ class DocumentProcessor:
         self.supported_formats = {'.pdf', '.docx', '.txt', '.jpg', '.jpeg', '.png'}
 
         # Get available models
-        self.available_models = get_available_models()
+        self.available_models = ModelRegistry.list_models()
         logger.info(f"Available AI models: {list(self.available_models.keys())}")
 
         # Initialize AI model based on preference
@@ -225,38 +222,22 @@ class DocumentProcessor:
         logger.debug(f"Initializing AI model: {model_name}")
 
         try:
-            if model_name not in self.available_models and model_name is not None:
-                logger.warning(f"Requested model '{model_name}' not available")
-                raise ModelNotAvailableError(f"Model '{model_name}' is not available")
+            # Get model class from registry
+            model_class = ModelRegistry.get_model(model_name) if model_name else ModelRegistry.get_model("fallback")
 
-            if model_name in ["llava", "llama-vision"]:
-                # Use appropriate variant based on model name
-                variant = "llava" if model_name == "llava" else "llama-3.2-vision"
-                logger.info(f"Initializing Ollama model with variant: {variant}")
-                try:
-                    return LlamaVisionModel(model_variant=variant)
-                except ModelNotAvailableError as e:
-                    logger.error(f"Failed to initialize {model_name}: {e}")
-                    raise
-            elif model_name == "gpt4-vision" and "gpt4-vision" in self.available_models:
-                return GPT4VisionModel()
-            elif model_name == "gemini" and "gemini" in self.available_models:
-                return GeminiModel()
+            if not model_class:
+                logger.warning(f"Model {model_name} not found, using fallback")
+                model_class = ModelRegistry.get_model("fallback")
 
-            # Only use fallback if explicitly requested or no model specified
-            if model_name == "fallback" or model_name is None:
-                return FallbackModel()
+            if not model_class.is_available():
+                raise Exception(f"Model {model_name} is not available")
 
-            raise ModelNotAvailableError(f"Model '{model_name}' initialization failed")
+            return model_class()
 
-        except ModelNotAvailableError as e:
-            if model_name == "fallback":
-                return FallbackModel()
-            logger.error(f"Model '{model_name}' not available: {e}")
-            raise
         except Exception as e:
             logger.error(f"Error initializing model '{model_name}': {e}", exc_info=True)
-            raise ModelNotAvailableError(f"Failed to initialize model '{model_name}': {e}")
+            # Always fall back to the fallback model
+            return ModelRegistry.get_model("fallback")()
 
     def get_supported_models(self) -> Dict[str, str]:
         """Return dictionary of available models and their descriptions"""

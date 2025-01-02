@@ -5,7 +5,7 @@ from enum import Enum
 import tempfile
 import os
 from pathlib import Path
-from .processor import DocumentProcessor, ModelNotAvailableError
+from .models import ModelRegistry
 import logging
 
 logger = logging.getLogger(__name__)
@@ -33,22 +33,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Create a base processor to get available models
-processor = DocumentProcessor()
-
 class AIModel(str, Enum):
     """Enum for available AI models"""
-    LLAVA = "llava"
-    LLAMA = "llama-vision"
-    GPT4 = "gpt4-vision"
-    GEMINI = "gemini"
-    FALLBACK = "fallback"
+    def __new__(cls):
+        # Dynamically create enum values from registered models
+        values = list(ModelRegistry.list_models().keys())
+        # Ensure fallback is always available
+        if "fallback" not in values:
+            values.append("fallback")
+        return str.__new__(cls, values[0])
 
 @app.get("/")
 async def root():
-    """
-    Welcome to DocFlow API
-    """
+    """Welcome to DocFlow API"""
     return {
         "name": "DocFlow API",
         "version": "1.0.0",
@@ -61,91 +58,52 @@ async def root():
 
 @app.get("/models")
 async def get_available_models():
-    """
-    Get list of available AI models
-    """
-    return {"models": processor.get_supported_models()}
+    """Get list of available AI models"""
+    return {"models": ModelRegistry.list_models()}
 
-@app.post("/process",
-    summary="Process a document",
-    response_description="Document metadata and classification results",
-    tags=["Document Processing"])
+@app.post("/process")
 async def process_document(
-    file: UploadFile = File(..., description="The document file (PDF, DOCX, TXT, JPG, JPEG, or PNG)"),
-    use_ocr: bool = Form(default=False, description="Enable OCR processing for documents", alias="use-ocr"),
-    include_text: bool = Form(default=False, description="Include extracted text in response", alias="include-text"),
-    convert_to_img: bool = Form(default=False, description="Convert document to image for vision model processing", alias="convert-to-img"),
-    model: AIModel = Form(default=AIModel.LLAMA, description="AI model to use for analysis")
+    file: UploadFile = File(...),
+    use_ocr: bool = Form(default=False),
+    include_text: bool = Form(default=False),
+    convert_to_img: bool = Form(default=False),
+    model: str = Form(default="llama-vision")
 ):
-    """
-    Process a document and extract metadata.
-
-    **Parameters:**
-    * file: The document file to process (PDF, DOCX, TXT, JPG, JPEG, or PNG)
-    * use-ocr: Enable OCR processing for documents (default: false)
-    * include-text: Include extracted text in response (default: false)
-    * convert-to-img: Convert document to image for vision model processing (default: false)
-    * model: AI model to use for analysis (default: llama-vision)
-
-    **Supported File Types:**
-    * PDF
-    * DOCX
-    * TXT
-    * JPG/JPEG
-    * PNG
-
-    **Available Models:**
-    * llama-vision (default) - Llama 3.2 Vision via Ollama (requires installation)
-    * llava - LLaVA via Ollama (requires installation)
-    * gpt4-vision - OpenAI's GPT-4 Turbo Vision (requires OPENAI_API_KEY)
-    * gemini - Google's Gemini Pro Vision (requires GOOGLE_API_KEY)
-    * fallback - Basic text analysis without AI
-
-    **Returns:**
-    - document_type: The classified type of the document
-    - metadata: Extracted metadata fields
-    - text_content: Full extracted text (if include-text is true)
-    - ai_analysis: AI model analysis results
-    """
+    """Process a document and extract metadata"""
     try:
-        # Get original file extension
-        original_extension = Path(file.filename).suffix.lower()
-        if original_extension not in processor.supported_formats:
+        # Validate model choice
+        model_class = ModelRegistry.get_model(model)
+        if not model_class:
+            logger.warning(f"Model {model} not found, falling back to fallback model")
+            model_class = ModelRegistry.get_model("fallback")
+
+        if not model_class.is_available():
             raise HTTPException(
                 status_code=400,
-                detail=f"Unsupported file format: {original_extension}. Supported formats: {', '.join(processor.supported_formats)}"
+                detail=f"Model {model} is not available in the current environment"
             )
 
-        # Create temporary file with correct extension
-        with tempfile.NamedTemporaryFile(suffix=original_extension, delete=False) as temp_file:
+        # Create model instance
+        model_instance = model_class()
+
+        # Process document
+        with tempfile.NamedTemporaryFile(delete=False) as temp_file:
             content = await file.read()
             temp_file.write(content)
             temp_path = temp_file.name
 
-        try:
-            # Initialize processor with selected model
             try:
-                processor_instance = DocumentProcessor(ai_model=model.value)
-            except ModelNotAvailableError as e:
-                raise HTTPException(
-                    status_code=400,
-                    detail=str(e)
+                result = model_instance.extract_information(
+                    text="",  # Text extraction will be handled by the processor
+                    image_path=temp_path if convert_to_img else None
                 )
 
-            result = processor_instance.process_document(
-                temp_path, 
-                use_ocr=use_ocr,
-                convert_to_img=convert_to_img
-            )
+                if not include_text:
+                    result.pop('text_content', None)
 
-            # Remove text_content if not requested
-            if not include_text and 'text_content' in result:
-                del result['text_content']
-
-            return JSONResponse(content=result)
-        finally:
-            # Clean up temporary file
-            os.unlink(temp_path)
+                return JSONResponse(content=result)
+            finally:
+                os.unlink(temp_path)
 
     except Exception as e:
         logger.error(f"Error processing document: {e}")
