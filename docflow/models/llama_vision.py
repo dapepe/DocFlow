@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class LlamaVisionModel(BaseModel):
     """Llama Vision model using Ollama for document analysis"""
     description = "Llama Vision model (requires Ollama installation)"
-    requires_env_vars = ['OLLAMA_HOST']  # Only require host, model has default
+    requires_env_vars = []  # No required env vars since we have defaults
 
     def __init__(self):
         """Initialize the model with configuration from environment"""
@@ -36,12 +36,7 @@ class LlamaVisionModel(BaseModel):
     def is_available(cls) -> bool:
         """Check if Ollama service is available and model is installed"""
         try:
-            # First check if required environment variables are set
-            if not super().is_available():
-                logger.debug("LlamaVision environment variables not configured")
-                return False
-
-            # Then check if Ollama service is responding
+            # Check if Ollama service is responding
             host = os.getenv('OLLAMA_HOST', 'http://localhost:11434')
             logger.debug(f"Checking Ollama availability at {host}")
 

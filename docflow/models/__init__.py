@@ -37,27 +37,32 @@ class ModelRegistry:
         """List all registered models and their descriptions"""
         models = {}
         logger.debug(f"Checking availability for {len(cls._models)} registered models")
+
+        # Always include fallback model first
+        fallback_model = cls._models.get('fallback')
+        if fallback_model:
+            models['fallback'] = fallback_model.description
+            logger.debug("Added fallback model to available models")
+
+        # Check other models
         for model_id, model_class in cls._models.items():
-            try:
-                # Log environment variables for debugging
-                if hasattr(model_class, 'requires_env_vars'):
-                    env_vars = {var: bool(os.getenv(var)) for var in getattr(model_class, 'requires_env_vars', [])}
-                    logger.debug(f"Model {model_id} environment variables: {env_vars}")
+            if model_id != 'fallback':  # Skip fallback as it's already added
+                try:
+                    # Log environment variables for debugging
+                    if hasattr(model_class, 'requires_env_vars'):
+                        env_vars = {var: bool(os.getenv(var)) for var in getattr(model_class, 'requires_env_vars', [])}
+                        logger.debug(f"Model {model_id} environment variables: {env_vars}")
 
-                # Always include fallback model
-                if model_id == 'fallback':
-                    models[model_id] = getattr(model_class, 'description', 'Basic text analysis without AI')
-                    continue
+                    # Check availability
+                    is_available = model_class.is_available()
+                    logger.debug(f"Model {model_id} availability check: {is_available}")
 
-                # Check availability for other models
-                is_available = model_class.is_available()
-                logger.debug(f"Model {model_id} availability check: {is_available}")
+                    if is_available:
+                        models[model_id] = getattr(model_class, 'description', 'No description available')
+                        logger.info(f"Model {model_id} is available")
+                except Exception as e:
+                    logger.error(f"Error checking availability for model {model_id}: {e}", exc_info=True)
 
-                if is_available:
-                    models[model_id] = getattr(model_class, 'description', 'No description available')
-                    logger.info(f"Model {model_id} is available")
-            except Exception as e:
-                logger.error(f"Error checking availability for model {model_id}: {e}", exc_info=True)
         return models
 
 class BaseModel(ABC):
@@ -72,12 +77,12 @@ class BaseModel(ABC):
         if cls.__name__ == 'FallbackModel':
             return True
 
-        # Check environment variables
-        env_vars_present = all(bool(os.getenv(var)) for var in cls.requires_env_vars)
-        if not env_vars_present:
-            missing_vars = [var for var in cls.requires_env_vars if not os.getenv(var)]
-            logger.debug(f"Missing required environment variables for {cls.__name__}: {missing_vars}")
-        return env_vars_present
+        # For other models, check implementation-specific availability
+        try:
+            return True
+        except Exception as e:
+            logger.error(f"Error checking availability for {cls.__name__}: {e}")
+            return False
 
     @abstractmethod
     def extract_information(self, text: str, image_path: Optional[str] = None) -> Dict[str, Any]:
@@ -87,7 +92,6 @@ class BaseModel(ABC):
 # For backward compatibility
 BaseAIModel = BaseModel
 
-# Import all model implementations
 def load_models():
     """Dynamically load all model implementations"""
     models_dir = Path(__file__).parent
