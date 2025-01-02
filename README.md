@@ -21,75 +21,62 @@ DocFlow is an advanced document processing system that supports PDF, DOCX, and T
 ## Requirements
 
 - Python 3.11+
-- Dependencies are listed in requirements.txt and will be installed automatically when you run the project
-- For AI models:
-  - OpenAI API key for GPT-4 Vision
-  - xAI API key for Grok Vision
-  - Ollama server for LLaVA and Llama Vision
+- System dependencies:
+  - Poppler (for PDF processing)
+  - Pillow (for image processing)
+- Python dependencies (see requirements.txt):
+  - Core: fastapi, uvicorn, click, rich
+  - Document processing: pypdf2, python-docx, pdf2image
+  - AI models: openai, ollama, google-generativeai
+  - Utilities: pyyaml, python-dateutil, trafilatura
 
-## Getting started
+## Configuration
 
-### Run locally with Python
+### Logging
 
-1. Install system dependencies and configure AI models:
+Logging is configured in `config/logging.yaml` with:
+- Console and file output
+- Debug level for docflow modules
+- Standard format with timestamps
 
-**MacOS**
+### Document Rules
+
+Document processing rules are defined in `config/rules.yaml` with:
+- Document type detection based on keywords
+- Metadata fields to extract for each document type
+- Supported document types: invoice, receipt, contract
+
+## Getting Started
+
+1. Install system dependencies:
 
 ```bash
+# MacOS
 brew install poppler
-```
 
-**Windows**
-
-```bash
+# Windows
 choco install poppler
-```
 
-**Linux**
-
-```bash
+# Linux
 sudo apt-get install poppler-utils
 ```
 
-
-2. Clone the repository and install Python dependencies:
-
-```bash
-git clone https://github.com/your-repo/docflow.git
-cd docflow
-```
-
-3. I nstall Python dependencies:
+2. Install Python dependencies:
 
 ```bash
 pip install -r requirements.txt
-```  
-
-4. Configure your AI models in config/models.yaml:
-
-```yaml
-default_model: gpt4-vision
-fallback_model: llama-vision
-models:
-  gpt4-vision:
-    enabled: true
-    api_key: your_openai_key
-  grok-vision:
-    enabled: true
-    api_key: your_xai_key
-  llama-vision:
-    enabled: true
-    ollama_url: http://localhost:11434
-  llava:
-    enabled: true
-    ollama_url: http://localhost:11434
 ```
 
-5. Run the project:
+3. Configure AI models in `config/models.yaml` (see example below)
+
+4. Run the application:
 
 ```bash
-./serve.sh # To start the API server
-./process.sh path/to/document.pdf --ocr # To process a document
+# Start API server
+uvicorn docflow.api:app --reload
+
+# Process document via CLI
+python main.py process path/to/document.pdf --ocr
 ```
 
 ### Run with Docker
