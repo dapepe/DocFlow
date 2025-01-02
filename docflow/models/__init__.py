@@ -8,6 +8,7 @@ import importlib
 import logging
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -29,11 +30,17 @@ class ModelRegistry:
     @classmethod
     def list_models(cls) -> Dict[str, str]:
         """List all registered models and their descriptions"""
-        return {
-            model_id: model_class.description
-            for model_id, model_class in cls._models.items()
-            if hasattr(model_class, 'is_available') and model_class.is_available()
-        }
+        models = {}
+        for model_id, model_class in cls._models.items():
+            try:
+                if model_class.is_available():
+                    models[model_id] = model_class.description
+                    logger.debug(f"Model {model_id} is available")
+                else:
+                    logger.debug(f"Model {model_id} is not available")
+            except Exception as e:
+                logger.error(f"Error checking availability for model {model_id}: {e}")
+        return models
 
 class BaseModel(ABC):
     """Base class for all AI models"""
@@ -44,7 +51,7 @@ class BaseModel(ABC):
     @abstractmethod
     def is_available(cls) -> bool:
         """Check if the model is available in the current environment"""
-        return True
+        return all(bool(os.getenv(var)) for var in cls.requires_env_vars)
 
     @abstractmethod
     def extract_information(self, text: str, image_path: Optional[str] = None) -> Dict[str, Any]:
@@ -59,7 +66,7 @@ def load_models():
     """Dynamically load all model implementations"""
     models_dir = Path(__file__).parent
     for model_file in models_dir.glob("*.py"):
-        if model_file.stem not in ["__init__", "base"]:
+        if model_file.stem not in ["__init__", "base", "grok_vision"]:  # Exclude grok_vision
             module_name = f"{__package__}.{model_file.stem}"
             try:
                 importlib.import_module(module_name)
