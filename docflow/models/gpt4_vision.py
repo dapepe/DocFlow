@@ -41,14 +41,14 @@ class GPT4VisionModel(BaseModel):
     def __init__(self):
         """Initialize the model with configuration from environment"""
         self.api_key = os.getenv('OPENAI_API_KEY')
-        self.model = os.getenv('GPT4_VISION_MODEL', 'gpt-4-vision-preview')
+        self.model = os.getenv('GPT4_VISION_MODEL', 'gpt-4-vision-preview')  # Updated default model
         self.client = OpenAI(api_key=self.api_key)
         self.max_tokens = int(os.getenv('GPT4_MAX_TOKENS', '1000'))
         self.temperature = float(os.getenv('GPT4_TEMPERATURE', '0.2'))
         self.prompt_template = os.getenv('GPT4_PROMPT_TEMPLATE', 
             """Analyze this document and extract key information according to this schema:
             {schema}
-            
+
             Provide ONLY a JSON response following the schema exactly, no additional text.
             Focus on accuracy and completeness of the extracted information.""")
 
@@ -63,7 +63,7 @@ class GPT4VisionModel(BaseModel):
         """Extract information using GPT-4 Vision model"""
         try:
             messages = []
-            
+
             # Prepare system message with schema
             messages.append({
                 "role": "system",
@@ -79,7 +79,7 @@ class GPT4VisionModel(BaseModel):
 
             # Prepare user message with content
             user_content = []
-            
+
             # Add text content if available
             if text:
                 user_content.append({
@@ -117,9 +117,9 @@ class GPT4VisionModel(BaseModel):
                     temperature=self.temperature,
                     response_format={"type": "json_object"}
                 )
-                
+
                 analysis = json.loads(response.choices[0].message.content)
-                
+
                 return {
                     "raw_analysis": analysis,
                     "model_name": self.model,
