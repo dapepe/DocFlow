@@ -9,7 +9,6 @@ import json
 import base64
 from typing import Dict, Any, Optional
 import logging
-import requests
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +59,7 @@ class LlamaVisionModel(OllamaBaseModel):
                 "prompt": self._get_prompt_template(text),
                 "stream": False,
                 "options": {
-                    "temperature": 0.2
+                    "temperature": float(os.getenv('OLLAMA_LLAMA_VISION_TEMPERATURE', self.config['temperature']))
                 }
             }
 

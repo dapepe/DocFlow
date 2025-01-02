@@ -7,6 +7,8 @@ import requests
 from typing import Dict, Any, Optional
 from . import BaseModel
 import logging
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 
 logger = logging.getLogger(__name__)
 
@@ -15,11 +17,60 @@ class OllamaBaseModel(BaseModel):
     description = "Base Ollama Model"
     requires_env_vars = []  # No required env vars since we have defaults
 
+    # Default configuration
+    DEFAULT_CONFIG = {
+        'host': 'http://localhost:11434',
+        'temperature': 0.2,
+        'timeout': 30,
+        'max_retries': 3,
+        'retry_backoff_factor': 0.3,
+        'retry_on_status': [408, 429, 500, 502, 503, 504],
+    }
+
     def __init__(self):
         """Initialize the model with configuration from environment"""
-        self.host = os.getenv('OLLAMA_HOST', 'http://localhost:11434')
+        self.config = self._load_config()
         self.model = self._get_model_name()
-        logger.debug(f"Initialized Ollama model with host={self.host}, model={self.model}")
+        self.session = self._setup_requests_session()
+        logger.debug(f"Initialized Ollama model with config={self.config}, model={self.model}")
+
+    def _load_config(self) -> Dict[str, Any]:
+        """Load configuration from environment variables with defaults"""
+        config = self.DEFAULT_CONFIG.copy()
+
+        # Override defaults with environment variables if present
+        env_mapping = {
+            'OLLAMA_HOST': ('host', str),
+            'OLLAMA_TEMPERATURE': ('temperature', float),
+            'OLLAMA_TIMEOUT': ('timeout', int),
+            'OLLAMA_MAX_RETRIES': ('max_retries', int),
+            'OLLAMA_RETRY_BACKOFF': ('retry_backoff_factor', float),
+        }
+
+        for env_var, (config_key, type_func) in env_mapping.items():
+            if value := os.getenv(env_var):
+                try:
+                    config[config_key] = type_func(value)
+                except ValueError as e:
+                    logger.warning(f"Invalid value for {env_var}: {e}")
+
+        return config
+
+    def _setup_requests_session(self) -> requests.Session:
+        """Set up a requests session with retry logic"""
+        session = requests.Session()
+
+        retry_strategy = Retry(
+            total=self.config['max_retries'],
+            backoff_factor=self.config['retry_backoff_factor'],
+            status_forcelist=self.config['retry_on_status']
+        )
+
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+
+        return session
 
     @classmethod
     def _get_model_name(cls) -> str:
@@ -31,7 +82,7 @@ class OllamaBaseModel(BaseModel):
         """Check if Ollama service is available and the required model is installed"""
         try:
             # Check if Ollama service is responding
-            host = os.getenv('OLLAMA_HOST', 'http://localhost:11434')
+            host = os.getenv('OLLAMA_HOST', cls.DEFAULT_CONFIG['host'])
             logger.debug(f"Checking Ollama availability at {host}")
 
             response = requests.get(f"{host}/api/tags")
@@ -62,8 +113,18 @@ class OllamaBaseModel(BaseModel):
     def _make_ollama_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Make a request to Ollama API with proper error handling"""
         try:
-            logger.debug(f"Making request to Ollama API at {self.host}")
-            response = requests.post(f"{self.host}/api/generate", json=payload)
+            # Add default options if not present
+            if 'options' not in payload:
+                payload['options'] = {}
+            if 'temperature' not in payload['options']:
+                payload['options']['temperature'] = self.config['temperature']
+
+            logger.debug(f"Making request to Ollama API at {self.config['host']}")
+            response = self.session.post(
+                f"{self.config['host']}/api/generate",
+                json=payload,
+                timeout=self.config['timeout']
+            )
             response.raise_for_status()
             return response.json()
         except Exception as e:
