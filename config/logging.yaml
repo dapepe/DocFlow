@@ -15,11 +15,15 @@ handlers:
     filename: docflow.log
 loggers:
   docflow:
-    level: DEBUG
+    level: INFO
     handlers: [console, file]
     propagate: no
   docflow.processor:
-    level: DEBUG
+    level: INFO
+    handlers: [console, file]
+    propagate: no
+  docflow.models:
+    level: INFO
     handlers: [console, file]
     propagate: no
 root:

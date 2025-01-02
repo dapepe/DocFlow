@@ -56,7 +56,8 @@ class GPT4VisionModel(BaseModel):
     def is_available(cls) -> bool:
         """Check if OpenAI API key is configured"""
         api_key = os.getenv('OPENAI_API_KEY')
-        logger.debug(f"Checking GPT-4 Vision availability: API key {'present' if api_key else 'missing'}")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Checking GPT-4 Vision availability: API key {'present' if api_key else 'missing'}")
         return bool(api_key)
 
     def extract_information(self, text: str, image_path: Optional[str] = None) -> Dict[str, Any]:
@@ -110,6 +111,9 @@ class GPT4VisionModel(BaseModel):
 
             # Make request to OpenAI API
             try:
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug(f"Making OpenAI API request with model: {self.model}")
+
                 response = self.client.chat.completions.create(
                     model=self.model,
                     messages=messages,

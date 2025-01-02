@@ -1,3 +1,7 @@
+"""
+Document processor implementation.
+Handles document processing and metadata extraction.
+"""
 import yaml
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Union
@@ -115,7 +119,8 @@ class DocumentProcessor:
         max_score = 0
         best_type = "unknown"
 
-        logger.debug("Starting document classification")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug("Starting document classification")
 
         for doc_type, type_config in self.rules.get('rules', {}).items():
             keywords = type_config.get('keywords', [])
@@ -138,13 +143,15 @@ class DocumentProcessor:
                     if re.search(pattern, text, re.IGNORECASE | re.MULTILINE):
                         score += 0.5
 
-            logger.debug(f"Document type '{doc_type}' scored {score} with keywords: {matched_keywords}")
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"Document type '{doc_type}' scored {score} with keywords: {matched_keywords}")
 
             if score > max_score:
                 max_score = score
                 best_type = doc_type
 
-        logger.debug(f"Final classification: {best_type} with score {max_score}")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Final classification: {best_type} with score {max_score}")
         return best_type
 
     def process_document(self, file_path: str, use_ocr: bool = False, convert_to_img: bool = False) -> Dict:
@@ -156,7 +163,8 @@ class DocumentProcessor:
 
             # Extract text and get image path if applicable
             text, image_path = self._extract_text(file_path)
-            logger.debug(f"Extracted text length: {len(text)}, image path: {image_path}")
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"Extracted text length: {len(text)}, image path: {image_path}")
 
             # Convert to image if requested or needed for vision models
             if convert_to_img and path.suffix.lower() == '.pdf':
@@ -164,7 +172,8 @@ class DocumentProcessor:
                 # Only use the converted image if we don't already have one
                 if not image_path:
                     image_path = temp_image_path
-                    logger.debug(f"Created image from PDF: {image_path}")
+                    if logger.isEnabledFor(logging.DEBUG):
+                        logger.debug(f"Created image from PDF: {image_path}")
 
             # Use AI model for enhanced extraction
             ai_analysis = None
@@ -221,7 +230,8 @@ class DocumentProcessor:
 
     def _initialize_ai_model(self, model_name: Optional[str]) -> BaseAIModel:
         """Initialize the specified AI model with proper error handling"""
-        logger.debug(f"Initializing AI model: {model_name}")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Initializing AI model: {model_name}")
 
         try:
             # Get model class from registry
@@ -252,6 +262,56 @@ class DocumentProcessor:
         except Exception as e:
             logger.error(f"Error loading rules file: {e}")
             return {}
+
+    def _extract_metadata(self, text: str, doc_type: str) -> Dict:
+        """Extract metadata using patterns from rules"""
+        metadata = {}
+        fields = self.rules.get('rules', {}).get(doc_type, {}).get('metadata_fields', {})
+
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Attempting to extract metadata for type '{doc_type}'")
+            logger.debug(f"Available fields: {fields}")
+
+        for field_name, field_config in fields.items():
+            pattern = field_config.get('pattern', '')
+            if field_name == 'total_amount':
+                pattern = r'(?i)(?:total\s+net|amount\s+due|total|amount|sum|betrag|summe|rechnungsbetrag)[\s:]*[$€£]?\s*([\d.,]+(?:[\.,]\d{2})?)\s*[$€£]?'
+            elif field_name == 'date':
+                pattern = r'(?i)(?:invoice\s+date|date|datum|belegdatum)[\s:]*(\d{1,2}[-/\.]\d{1,2}[-/\.]\d{4})'
+            elif field_name == 'invoice_number':
+                # Updated pattern to handle GC-2024/12/01 format
+                pattern = r'(?i)(?:Invoice\s+No\.?:|Rechnung\s+Nr\.?:|Rechnungsnummer:?|Invoice\s+number:?)\s*((?:[A-Za-z]{1,4}[-]?\d{4}[-/]\d{1,2}[-/]\d{1,2})|(?:[A-Za-z0-9][-A-Za-z0-9/]*[A-Za-z0-9]))'
+
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"Using pattern for {field_name}: {pattern}")
+
+            matches = re.findall(pattern, text, re.MULTILINE | re.IGNORECASE)
+            if matches:
+                value = matches[0]
+                if isinstance(value, tuple):
+                    value = value[0]
+                try:
+                    field_type = field_config.get('type', 'String')
+                    converted_value = self._convert_value(value, field_type)
+                    metadata[field_name] = converted_value
+                    if logger.isEnabledFor(logging.DEBUG):
+                        logger.debug(f"Field {field_name}: found and converted to {field_type}")
+                except Exception as e:
+                    logger.error(f"Error converting field {field_name}: {e}")
+                    continue
+
+        return metadata
+
+    def _convert_value(self, value: str, field_type: str) -> Any:
+        """Convert extracted value to the specified type"""
+        if field_type == "Date":
+            return self._parse_date(value)
+        elif field_type == "Float":
+            return self._parse_float(value)
+        elif field_type == "Int":
+            return int(float(self._parse_float(value)))
+        else:  # String or unknown type
+            return value
 
     def _parse_date(self, date_str: str) -> str:
         """Parse date string to YYYY-MM-DD format"""
@@ -286,50 +346,3 @@ class DocumentProcessor:
         except Exception as e:
             logger.error(f"Error parsing float {amount_str}: {e}")
             return 0.0
-
-    def _extract_metadata(self, text: str, doc_type: str) -> Dict:
-        """Extract metadata using patterns from rules"""
-        metadata = {}
-        fields = self.rules.get('rules', {}).get(doc_type, {}).get('metadata_fields', {})
-
-        logger.debug(f"Attempting to extract metadata for type '{doc_type}'")
-        logger.debug(f"Available fields: {fields}")
-
-        for field_name, field_config in fields.items():
-            pattern = field_config.get('pattern', '')
-            if field_name == 'total_amount':
-                pattern = r'(?i)(?:total\s+net|amount\s+due|total|amount|sum|betrag|summe|rechnungsbetrag)[\s:]*[$€£]?\s*([\d.,]+(?:[\.,]\d{2})?)\s*[$€£]?'
-            elif field_name == 'date':
-                pattern = r'(?i)(?:invoice\s+date|date|datum|belegdatum)[\s:]*(\d{1,2}[-/\.]\d{1,2}[-/\.]\d{4})'
-            elif field_name == 'invoice_number':
-                # Updated pattern to handle GC-2024/12/01 format
-                pattern = r'(?i)(?:Invoice\s+No\.?:|Rechnung\s+Nr\.?:|Rechnungsnummer:?|Invoice\s+number:?)\s*((?:[A-Za-z]{1,4}[-]?\d{4}[-/]\d{1,2}[-/]\d{1,2})|(?:[A-Za-z0-9][-A-Za-z0-9/]*[A-Za-z0-9]))'
-
-            logger.debug(f"Using pattern for {field_name}: {pattern}")
-
-            matches = re.findall(pattern, text, re.MULTILINE | re.IGNORECASE)
-            if matches:
-                value = matches[0]
-                if isinstance(value, tuple):
-                    value = value[0]
-                try:
-                    field_type = field_config.get('type', 'String')
-                    converted_value = self._convert_value(value, field_type)
-                    metadata[field_name] = converted_value
-                    logger.debug(f"Field {field_name}: found and converted to {field_type}")
-                except Exception as e:
-                    logger.error(f"Error converting field {field_name}: {e}")
-                    continue
-
-        return metadata
-
-    def _convert_value(self, value: str, field_type: str) -> Any:
-        """Convert extracted value to the specified type"""
-        if field_type == "Date":
-            return self._parse_date(value)
-        elif field_type == "Float":
-            return self._parse_float(value)
-        elif field_type == "Int":
-            return int(float(self._parse_float(value)))
-        else:  # String or unknown type
-            return value

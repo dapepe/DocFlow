@@ -32,7 +32,7 @@ class OllamaBaseModel(BaseModel):
         self.config = self._load_config()
         self.model = self._get_model_name()
         self.session = self._setup_requests_session()
-        logger.debug(f"Initialized Ollama model with config={self.config}, model={self.model}")
+        logger.info(f"Initialized Ollama model: {self.model}")
 
     def _load_config(self) -> Dict[str, Any]:
         """Load configuration from environment variables with defaults"""
@@ -83,10 +83,10 @@ class OllamaBaseModel(BaseModel):
         try:
             # Check if Ollama service is responding
             host = os.getenv('OLLAMA_HOST', cls.DEFAULT_CONFIG['host'])
-            logger.debug(f"Checking Ollama availability at {host}")
+            logger.info(f"Checking Ollama availability at {host}")
 
             session = requests.Session()
-            response = session.get(f"{host}/api/tags", timeout=30)  # Increased timeout
+            response = session.get(f"{host}/api/tags", timeout=30)
 
             if response.status_code == 200:
                 models = response.json().get('models', [])
@@ -95,7 +95,7 @@ class OllamaBaseModel(BaseModel):
                 base_model = required_model.split(':')[0]
 
                 available_models = [m.get('name', '') for m in models]
-                logger.debug(f"Found Ollama models: {available_models}")
+                logger.info(f"Available Ollama models: {available_models}")
 
                 # Check if any model starts with our base model name
                 is_model_available = any(
@@ -109,7 +109,7 @@ class OllamaBaseModel(BaseModel):
             return False
 
         except requests.exceptions.ConnectionError as e:
-            logger.debug(f"Ollama service connection failed: {e}")
+            logger.info(f"Ollama service not available at {host}")
             return False
         except Exception as e:
             logger.error(f"Unexpected error checking Ollama availability: {e}")
@@ -124,7 +124,7 @@ class OllamaBaseModel(BaseModel):
             if 'temperature' not in payload['options']:
                 payload['options']['temperature'] = self.config['temperature']
 
-            logger.debug(f"Making request to Ollama API at {self.config['host']}")
+            logger.info(f"Making request to Ollama API")
             response = self.session.post(
                 f"{self.config['host']}/api/generate",
                 json=payload,

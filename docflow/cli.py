@@ -6,16 +6,37 @@ from pathlib import Path
 import uvicorn
 from .processor import DocumentProcessor
 import logging
+import os
 
 console = Console()
 logger = logging.getLogger(__name__)
 
+def set_verbose_logging(verbose: bool):
+    """Configure logging based on verbosity"""
+    # Set environment variable for logging configuration
+    os.environ['DOCFLOW_LOG_LEVEL'] = 'DEBUG' if verbose else 'INFO'
+    # Re-initialize logging
+    from .config import setup_logging
+    setup_logging()
+
+def verbose_option(f):
+    """Decorator to add verbose option to commands"""
+    def callback(ctx, param, value):
+        if value:
+            set_verbose_logging(True)
+        return value
+    return click.option('--verbose', is_flag=True, 
+                       help="Enable verbose logging",
+                       callback=callback)(f)
+
 @click.group()
-def cli():
+@verbose_option
+def cli(verbose):
     """DocFlow - Document Processing Tool"""
     pass
 
 @cli.command()
+@verbose_option
 def models():
     """List available AI models"""
     processor = DocumentProcessor()
@@ -35,12 +56,13 @@ def models():
 @click.option('--use-ocr', is_flag=True, help="Enable OCR processing")
 @click.option('--output', '-o', type=click.Path(), help="Output file path for JSON results")
 @click.option('--model', '-m', 
-              type=click.Choice(['llama-vision', 'gpt4-vision', 'gemini', 'fallback']),
+              type=click.Choice(['llama-vision', 'gpt4-vision', 'fallback']),
               default='llama-vision',
               help="Choose AI model for analysis")
 @click.option('--include-text', is_flag=True, help="Display the extracted text content")
 @click.option('--save-text', type=click.Path(), help="Save extracted text to a separate file")
-def process(file_path: str, use_ocr: bool, output: str, model: str, include_text: bool, save_text: str):
+@verbose_option
+def process(file_path: str, use_ocr: bool, output: str, model: str, include_text: bool, save_text: str, verbose: bool):
     """Process a single document with optional AI model selection"""
     try:
         processor = DocumentProcessor(ai_model=model)
@@ -97,12 +119,13 @@ def process(file_path: str, use_ocr: bool, output: str, model: str, include_text
 
     except Exception as e:
         console.print(f"[red]Error:[/red] {str(e)}")
-        logger.error(f"CLI processing error: {e}")
+        logger.error(f"CLI processing error: {e}", exc_info=True)
 
 @cli.command()
 @click.option('--host', default='0.0.0.0', help="Host to bind to")
 @click.option('--port', default=8000, help="Port to bind to")
-def serve(host: str, port: int):
+@verbose_option
+def serve(host: str, port: int, verbose: bool):
     """Start the REST API server"""
     try:
         console.print(Panel.fit(

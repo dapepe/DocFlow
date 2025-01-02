@@ -27,7 +27,7 @@ class ModelRegistry:
         """Get a model class by its ID"""
         model = cls._models.get(model_id)
         if model:
-            logger.debug(f"Retrieved model {model_id} from registry")
+            logger.info(f"Retrieved model {model_id} from registry")
         else:
             logger.warning(f"Model {model_id} not found in registry")
         return model
@@ -36,13 +36,13 @@ class ModelRegistry:
     def list_models(cls) -> Dict[str, str]:
         """List all registered models and their descriptions"""
         models = {}
-        logger.debug(f"Checking availability for {len(cls._models)} registered models")
+        logger.info(f"Checking availability for {len(cls._models)} registered models")
 
         # Always include fallback model first
         fallback_model = cls._models.get('fallback')
         if fallback_model:
             models['fallback'] = fallback_model.description
-            logger.debug("Added fallback model to available models")
+            logger.info("Added fallback model to available models")
 
         # Check other models
         for model_id, model_class in cls._models.items():
@@ -51,11 +51,11 @@ class ModelRegistry:
                     # Log environment variables for debugging
                     if hasattr(model_class, 'requires_env_vars'):
                         env_vars = {var: bool(os.getenv(var)) for var in getattr(model_class, 'requires_env_vars', [])}
-                        logger.debug(f"Model {model_id} environment variables: {env_vars}")
+                        logger.info(f"Model {model_id} environment variables: {env_vars}")
 
                     # Check availability
                     is_available = model_class.is_available()
-                    logger.debug(f"Model {model_id} availability check: {is_available}")
+                    logger.info(f"Model {model_id} availability check: {is_available}")
 
                     if is_available:
                         models[model_id] = getattr(model_class, 'description', 'No description available')
