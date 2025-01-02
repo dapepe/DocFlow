@@ -1,3 +1,4 @@
+"""DocFlow CLI module for command line interface functionality"""
 import click
 from rich.console import Console
 from rich.table import Table
@@ -7,14 +8,27 @@ import uvicorn
 from .processor import DocumentProcessor
 import logging
 import os
+from .models import ModelRegistry
 
 console = Console()
 logger = logging.getLogger(__name__)
 
+def get_available_models():
+    """Get list of available model IDs"""
+    try:
+        models = ModelRegistry.list_models()
+        if not models:
+            logger.warning("No models available, using fallback")
+            return ['fallback']
+        return list(models.keys())
+    except Exception as e:
+        logger.error(f"Error getting available models: {e}")
+        return ['fallback']
+
 def set_verbose_logging(verbose: bool):
     """Configure logging based on verbosity"""
     # Set environment variable for logging configuration
-    os.environ['DOCFLOW_LOG_LEVEL'] = 'DEBUG' if verbose else 'INFO'
+    os.environ['DOCFLOW_LOG_LEVEL'] = 'DEBUG' if verbose else 'ERROR'
     # Re-initialize logging
     from .config import setup_logging
     setup_logging()
@@ -37,7 +51,7 @@ def cli(verbose):
 
 @cli.command()
 @verbose_option
-def models():
+def models(verbose):
     """List available AI models"""
     processor = DocumentProcessor()
     models = processor.get_supported_models()
@@ -56,8 +70,8 @@ def models():
 @click.option('--use-ocr', is_flag=True, help="Enable OCR processing")
 @click.option('--output', '-o', type=click.Path(), help="Output file path for JSON results")
 @click.option('--model', '-m', 
-              type=click.Choice(['llama-vision', 'gpt4-vision', 'fallback']),
-              default='llama-vision',
+              type=click.Choice(get_available_models(), case_sensitive=False),
+              default=lambda: os.getenv('PRIMARY_MODEL', 'fallback'),  # Default from environment or fallback
               help="Choose AI model for analysis")
 @click.option('--include-text', is_flag=True, help="Display the extracted text content")
 @click.option('--save-text', type=click.Path(), help="Save extracted text to a separate file")
