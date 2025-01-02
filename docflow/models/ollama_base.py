@@ -1,26 +1,20 @@
 """
-Llama Vision Model Implementation
-Provides document analysis using Llama Vision model via Ollama
+Base Ollama Model Implementation
+Provides shared functionality for Ollama-based models
 """
-from .ollama_base import OllamaBaseModel
-from . import ModelRegistry
 import os
 import json
 import requests
 from typing import Dict, Any, Optional
+from . import BaseModel
 import logging
 
 logger = logging.getLogger(__name__)
 
-class LlamaVisionModel(OllamaBaseModel):
-    """Llama Vision model using Ollama for document analysis"""
-    description = "Llama Vision model for advanced document analysis"
+class OllamaBaseModel(BaseModel):
+    """Base class for Ollama-based models"""
+    description = "Base Ollama Model"
     requires_env_vars = []  # No required env vars since we have defaults
-
-    @classmethod
-    def _get_model_name(cls) -> str:
-        """Get the Llama Vision model name"""
-        return os.getenv('OLLAMA_LLAMA_VISION_MODEL', 'llama3.2-vision:latest')
 
     def __init__(self):
         """Initialize the model with configuration from environment"""
@@ -36,11 +30,16 @@ class LlamaVisionModel(OllamaBaseModel):
 
             Provide the analysis in a structured format.
             """)
-        logger.debug(f"Initialized LlamaVision with host={self.host}, model={self.model}")
+        logger.debug(f"Initialized Ollama model with host={self.host}, model={self.model}")
+
+    @classmethod
+    def _get_model_name(cls) -> str:
+        """Get the model name with proper format. Override in subclasses."""
+        raise NotImplementedError("Subclasses must implement _get_model_name")
 
     @classmethod
     def is_available(cls) -> bool:
-        """Check if Ollama service is available and model is installed"""
+        """Check if Ollama service is available and the required model is installed"""
         try:
             # Check if Ollama service is responding
             host = os.getenv('OLLAMA_HOST', 'http://localhost:11434')
@@ -53,7 +52,11 @@ class LlamaVisionModel(OllamaBaseModel):
                 available_models = [m.get('name', '') for m in models]
                 logger.debug(f"Found Ollama models: {available_models}")
 
-                is_model_available = required_model in available_models
+                # Check if the model exists (including version tag)
+                is_model_available = any(
+                    m.startswith(required_model.split(':')[0])
+                    for m in available_models
+                )
                 logger.debug(f"Required model {required_model} availability: {is_model_available}")
                 return is_model_available
 
@@ -68,7 +71,7 @@ class LlamaVisionModel(OllamaBaseModel):
             return False
 
     def extract_information(self, text: str, image_path: Optional[str] = None) -> Dict[str, Any]:
-        """Extract information using Llama Vision model"""
+        """Extract information using Ollama model"""
         try:
             # Prepare the request payload
             payload = {
@@ -109,13 +112,9 @@ class LlamaVisionModel(OllamaBaseModel):
             }
 
         except Exception as e:
-            logger.error(f"Error in Llama Vision analysis: {e}")
+            logger.error(f"Error in Ollama analysis: {e}")
             return {
                 "success": False,
                 "error": str(e),
                 "model_name": self.model
             }
-
-# Register the Llama Vision model
-ModelRegistry.register("llama-vision", LlamaVisionModel)
-ModelRegistry.register("llava", LlamaVisionModel)  # Register LLaVA as an alias
