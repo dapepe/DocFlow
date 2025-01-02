@@ -41,7 +41,8 @@ class GPT4VisionModel(BaseModel):
     def __init__(self):
         """Initialize the model with configuration from environment"""
         self.api_key = os.getenv('OPENAI_API_KEY')
-        self.model = os.getenv('GPT4_VISION_MODEL', 'gpt-4-turbo')
+        # Use configured model or latest supported version
+        self.model = os.getenv('GPT4_VISION_MODEL', 'gpt-4-vision-preview')
         self.client = OpenAI(api_key=self.api_key)
         self.max_tokens = int(os.getenv('GPT4_MAX_TOKENS', '1000'))
         self.temperature = float(os.getenv('GPT4_TEMPERATURE', '0.2'))
