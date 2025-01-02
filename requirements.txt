@@ -19,3 +19,4 @@ trafilatura
 pdf2image
 pillow
 openai
+openai
