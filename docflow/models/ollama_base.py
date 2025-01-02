@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional
 from . import BaseModel
 import logging
 from requests.adapters import HTTPAdapter
-from urllib3.util import Retry  # Updated import to fix the LSP issue
+from urllib3.util import Retry
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ class OllamaBaseModel(BaseModel):
     DEFAULT_CONFIG = {
         'host': 'http://localhost:11434',
         'temperature': 0.2,
-        'timeout': 30,
+        'timeout': 60,  # Increased timeout
         'max_retries': 3,
         'retry_backoff_factor': 0.3,
         'retry_on_status': [408, 429, 500, 502, 503, 504],
@@ -86,20 +86,23 @@ class OllamaBaseModel(BaseModel):
             logger.debug(f"Checking Ollama availability at {host}")
 
             session = requests.Session()
-            response = session.get(f"{host}/api/tags", timeout=5)  # Added timeout
+            response = session.get(f"{host}/api/tags", timeout=30)  # Increased timeout
 
             if response.status_code == 200:
                 models = response.json().get('models', [])
                 required_model = cls._get_model_name()
+                # Get base model name without version tag
+                base_model = required_model.split(':')[0]
+
                 available_models = [m.get('name', '') for m in models]
                 logger.debug(f"Found Ollama models: {available_models}")
 
-                # Check if the model exists (including version tag)
+                # Check if any model starts with our base model name
                 is_model_available = any(
-                    m.startswith(required_model.split(':')[0])
+                    m.startswith(base_model)
                     for m in available_models
                 )
-                logger.debug(f"Required model {required_model} availability: {is_model_available}")
+                logger.info(f"Required model {required_model} availability: {is_model_available}")
                 return is_model_available
 
             logger.warning(f"Ollama service returned status code: {response.status_code}")
@@ -115,10 +118,6 @@ class OllamaBaseModel(BaseModel):
     def _make_ollama_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         """Make a request to Ollama API with proper error handling"""
         try:
-            # Verify service availability before making request
-            if not self.is_available():
-                raise Exception(f"Ollama service or model {self.model} is not available")
-
             # Add default options if not present
             if 'options' not in payload:
                 payload['options'] = {}
