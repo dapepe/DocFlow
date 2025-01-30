@@ -16,24 +16,6 @@ class LLaVAModel(OllamaBaseModel):
     """LLaVA model using Ollama for document analysis"""
     description = "LLaVA model for advanced document analysis"
 
-    # Document analysis schema
-    ANALYSIS_SCHEMA = {
-        "document_type": "Type of document (invoice, contract, report, etc.)",
-        "content_summary": "Brief summary of the document content",
-        "key_points": ["List of important points or findings"],
-        "entities": {
-            "organizations": ["Company names"],
-            "people": ["Person names"],
-            "locations": ["Location names"]
-        },
-        "metadata": {
-            "reference_number": "Document reference number if present",
-            "date": "Document date if present",
-            "category": "Document category or classification"
-        },
-        "visual_elements": ["Description of important visual elements if image is provided"]
-    }
-
     @classmethod
     def _get_model_name(cls) -> str:
         """Get the LLaVA model name"""
@@ -41,52 +23,44 @@ class LLaVAModel(OllamaBaseModel):
 
     def _get_prompt_template(self, text: str) -> str:
         """Get the prompt template for document analysis"""
-        return f"""As a document analysis expert, provide a comprehensive analysis of this document in JSON format.
+        return f"""Analyze this document and extract the key information according to the provided schema.
 
-        Structure your response according to this schema:
-        {json.dumps(self.ANALYSIS_SCHEMA, indent=2)}
+Document to analyze:
+{text}
 
-        Document content to analyze:
-        {text}
-
-        Provide ONLY the JSON response, no additional text.
-        """
+Requirements:
+1. Use YYYY-MM-DD for all dates
+2. Use numbers for amounts (not strings)
+3. Provide ONLY the JSON response, no additional text"""
 
     def extract_information(self, text: str, image_path: Optional[str] = None) -> Dict[str, Any]:
-        """Extract information using LLaVA model"""
+        """Extract information from text and/or image using LLaVA"""
         try:
-            # Prepare the request payload
-            payload = {
-                "model": self.model,
-                "prompt": self._get_prompt_template(text),
-                "stream": False,
-                "options": {
-                    "temperature": float(os.getenv('OLLAMA_LLAVA_TEMPERATURE', self.config['temperature']))
-                }
-            }
-
+            prompt = self._get_prompt_template(text)
+            
             # Add image if available
             if image_path:
                 with open(image_path, "rb") as image_file:
                     image_data = base64.b64encode(image_file.read()).decode('utf-8')
-                    payload["images"] = [image_data]
+                    self.images = [image_data]
 
-            # Make request to Ollama API
-            result = self._make_ollama_request(payload)
-            analysis = result.get('response', '')
-
-            # Try to extract structured information from the response
-            try:
-                structured_data = json.loads(analysis)
-            except json.JSONDecodeError:
-                structured_data = {"raw_text": analysis}
-
-            return {
-                "raw_analysis": structured_data,
-                "model_name": self.model,
-                "success": True
-            }
-
+            # Make the API request using the base class method
+            response = self._make_request(prompt)
+            
+            if isinstance(response, dict) and 'error' not in response:
+                return {
+                    "raw_analysis": response,
+                    "model_name": self.model,
+                    "success": True
+                }
+            else:
+                logger.error(f"Invalid response from LLaVA: {response}")
+                return {
+                    "success": False,
+                    "error": "Failed to get valid response from LLaVA",
+                    "model_name": self.model
+                }
+                
         except Exception as e:
             logger.error(f"Error in LLaVA analysis: {e}")
             return {

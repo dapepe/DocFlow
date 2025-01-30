@@ -166,67 +166,82 @@ class DocumentProcessor:
             if logger.isEnabledFor(logging.DEBUG):
                 logger.debug(f"Extracted text length: {len(text)}, image path: {image_path}")
 
-            # Convert to image if requested or needed for vision models
-            if convert_to_img and path.suffix.lower() == '.pdf':
-                temp_image_path = self._process_pdf_for_vision(file_path)
-                # Only use the converted image if we don't already have one
-                if not image_path:
-                    image_path = temp_image_path
-                    if logger.isEnabledFor(logging.DEBUG):
-                        logger.debug(f"Created image from PDF: {image_path}")
-
             # Use AI model for enhanced extraction
-            ai_analysis = None
+            result = {
+                "file_name": path.name,
+                "text_length": len(text)
+            }
+
             try:
                 logger.info(f"Processing with AI model: {self.ai_model.__class__.__name__}")
                 ai_analysis = self.ai_model.extract_information(
                     text=text,
-                    image_path=image_path or (file_path if path.suffix.lower() in {'.jpg', '.jpeg', '.png', '.pdf'} else None)
+                    image_path=image_path
                 )
-                if not ai_analysis.get('success'):
+                
+                if ai_analysis.get('success'):
+                    # Extract fields from schema-based response
+                    raw_analysis = ai_analysis.get('raw_analysis', {})
+                    
+                    # Add core fields
+                    result['document_type'] = raw_analysis.get('doctype')
+                    if raw_analysis.get('date'):
+                        result['date'] = raw_analysis['date']
+                    if raw_analysis.get('title'):
+                        result['title'] = raw_analysis['title']
+                    if raw_analysis.get('reference'):
+                        result['reference'] = raw_analysis['reference']
+                    
+                    # Add metadata
+                    meta = raw_analysis.get('meta', {})
+                    if meta:
+                        # Add dates
+                        if 'dates' in meta:
+                            result['dates'] = meta['dates']
+                        
+                        # Add amounts
+                        if 'amounts' in meta:
+                            for key, value in meta['amounts'].items():
+                                if value is not None:  # Only add non-null values
+                                    result[f'{key}_amount'] = value
+                        
+                        # Add entities
+                        if 'entities' in meta:
+                            result['entities'] = meta['entities']
+                    
+                    result['ai_analysis'] = ai_analysis
+                else:
                     logger.warning(f"AI analysis failed: {ai_analysis.get('error', 'Unknown error')}")
+                    
             except Exception as e:
                 logger.error(f"AI model analysis failed: {e}", exc_info=True)
-                ai_analysis = {
-                    "success": False,
-                    "error": str(e),
-                    "model_name": getattr(self.ai_model, 'model_name', 'unknown')
-                }
 
-            # Traditional processing for metadata extraction
-            doc_type = self._classify_document(text)
-            metadata = self._extract_metadata(text, doc_type)
-
-            # Use AI analysis to enhance document classification if available
-            if ai_analysis and ai_analysis.get('success'):
-                ai_doc_type = ai_analysis.get('raw_analysis', {}).get('document_type')
-                if ai_doc_type and doc_type == "unknown":
-                    doc_type = ai_doc_type.lower()
-                    # Re-extract metadata with new document type
-                    metadata.update(self._extract_metadata(text, doc_type))
-
-            result = {
-                "file_name": path.name,
-                "document_type": doc_type,
-                "metadata": metadata,
-                "text_length": len(text),
-                "text_content": text,
-                "ai_analysis": ai_analysis
-            }
-
-            # Clean up temporary image file if created
-            if image_path and image_path != file_path and not convert_to_img:
+            # Perform basic classification if needed
+            if 'document_type' not in result or not result['document_type']:
                 try:
-                    Path(image_path).unlink()
+                    classification = self._classify_document(text)
+                    if isinstance(classification, tuple):
+                        doc_type, confidence = classification
+                    else:
+                        doc_type = classification
+                        confidence = 1.0
+                    result['document_type'] = doc_type
+                    result['classification_confidence'] = confidence
                 except Exception as e:
-                    logger.warning(f"Failed to clean up temporary image: {e}")
+                    logger.error(f"Classification failed: {e}")
+                    result['document_type'] = 'unknown'
+                    result['classification_confidence'] = 0.0
 
             logger.info(f"Successfully processed document: {path.name}")
             return result
 
         except Exception as e:
-            logger.error(f"Error processing document {file_path}: {e}", exc_info=True)
-            raise
+            logger.error(f"Error processing document: {e}", exc_info=True)
+            return {
+                "error": str(e),
+                "file_name": path.name if 'path' in locals() else None,
+                "document_type": "unknown"  # Add default document type for error cases
+            }
 
     def _initialize_ai_model(self, model_name: Optional[str]) -> BaseAIModel:
         """Initialize the specified AI model with proper error handling"""

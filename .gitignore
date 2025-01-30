@@ -53,5 +53,5 @@ uv.lock
 .env
 
 # Test files
-test.*
+test*
 .aider*

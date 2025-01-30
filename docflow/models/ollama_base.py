@@ -9,6 +9,8 @@ from . import BaseModel
 import logging
 from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
+import json
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -29,10 +31,12 @@ class OllamaBaseModel(BaseModel):
 
     def __init__(self):
         """Initialize the model with configuration from environment"""
+        super().__init__()
         self.config = self._load_config()
         self.model = self._get_model_name()
         self.session = self._setup_requests_session()
-        logger.info(f"Initialized Ollama model: {self.model}")
+        self.schema = self._load_schema()
+        logger.info(f"Initialized Ollama model: {self.model} with schema")
 
     def _load_config(self) -> Dict[str, Any]:
         """Load configuration from environment variables with defaults"""
@@ -115,26 +119,122 @@ class OllamaBaseModel(BaseModel):
             logger.error(f"Unexpected error checking Ollama availability: {e}")
             return False
 
-    def _make_ollama_request(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """Make a request to Ollama API with proper error handling"""
+    def _load_schema(self) -> dict:
+        """Load JSON schema from file"""
+        schema_path = os.getenv('DOCFLOW_SCHEMA_PATH', 'config/schema.json')
         try:
-            # Add default options if not present
-            if 'options' not in payload:
-                payload['options'] = {}
-            if 'temperature' not in payload['options']:
-                payload['options']['temperature'] = self.config['temperature']
-
-            logger.info(f"Making request to Ollama API")
-            response = self.session.post(
-                f"{self.config['host']}/api/generate",
-                json=payload,
-                timeout=self.config['timeout']
-            )
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Ollama request failed: {e}")
-            raise Exception(f"Failed to communicate with Ollama service: {str(e)}")
+            with open(schema_path, 'r') as f:
+                return json.load(f)
         except Exception as e:
-            logger.error(f"Error in Ollama request: {e}")
+            logger.error(f"Failed to load schema from {schema_path}: {e}")
+            raise
+
+    def _generate_prompt_from_schema(self) -> str:
+        """Generate a prompt from the JSON schema"""
+        required_fields = self.schema.get('required', [])
+        properties = self.schema.get('properties', {})
+        
+        prompt_parts = ["Please analyze this document and provide information in the following format:"]
+        
+        # Add required fields first
+        prompt_parts.append("\nRequired fields:")
+        for field in required_fields:
+            field_info = properties.get(field, {})
+            description = field_info.get('description', '')
+            prompt_parts.append(f"- {field}: {description}")
+
+        # Add metadata fields
+        if 'meta' in properties:
+            meta_props = properties['meta'].get('properties', {})
+            prompt_parts.append("\nMetadata fields:")
+            
+            # Dates
+            if 'dates' in meta_props:
+                prompt_parts.append("- dates: Key-value pairs of important dates")
+            
+            # Amounts
+            if 'amounts' in meta_props:
+                prompt_parts.append("- amounts: Key-value pairs of monetary amounts")
+            
+            # Entities
+            if 'entities' in meta_props:
+                entities_props = meta_props['entities'].get('properties', {})
+                prompt_parts.append("- entities:")
+                for entity_type, entity_info in entities_props.items():
+                    description = entity_info.get('description', '')
+                    prompt_parts.append(f"  - {entity_type}: {description}")
+
+        return "\n".join(prompt_parts)
+
+    def _make_request(self, prompt: str) -> Dict[str, Any]:
+        """Make a request to Ollama API with proper formatting"""
+        url = f"{self.config['host']}/api/generate"
+        
+        payload = {
+            "model": self.model,
+            "prompt": prompt,
+            "format": self.schema,
+            "options": {
+                "temperature": self.config['temperature']
+                # Removed stop sequence to get complete response
+            }
+        }
+
+        try:
+            response = self.session.post(url, json=payload, timeout=self.config['timeout'])
+            response.raise_for_status()
+            
+            # Get the complete response text
+            response_text = ""
+            for line in response.text.strip().split('\n'):
+                if line:
+                    try:
+                        json_response = json.loads(line)
+                        if 'response' in json_response:
+                            response_text += json_response['response']
+                    except json.JSONDecodeError:
+                        continue
+
+            # Clean up and complete the response if necessary
+            response_text = response_text.strip()
+            
+            # Complete any incomplete JSON structure
+            open_braces = response_text.count('{')
+            close_braces = response_text.count('}')
+            if open_braces > close_braces:
+                response_text += '}' * (open_braces - close_braces)
+            
+            # Ensure we have a complete JSON object
+            if not response_text.startswith('{'):
+                response_text = '{' + response_text
+            if not response_text.endswith('}'):
+                response_text += '}'
+
+            # Try to parse the JSON
+            try:
+                # First try to parse as is
+                return json.loads(response_text)
+            except json.JSONDecodeError:
+                try:
+                    # Fix common formatting issues
+                    fixed_text = response_text.replace("'", '"')  # Replace single quotes
+                    fixed_text = re.sub(r'([{,])\s*(\w+):', r'\1"\2":', fixed_text)  # Quote property names
+                    fixed_text = re.sub(r',\s*}', '}', fixed_text)  # Remove trailing commas
+                    fixed_text = re.sub(r'}\s*{', '},{', fixed_text)  # Fix adjacent objects
+                    
+                    # Complete any incomplete structures
+                    if '"amounts": {' in fixed_text and '"amounts": {}' not in fixed_text:
+                        fixed_text = fixed_text.replace('"amounts": {', '"amounts": {}')
+                    if '"dates": {' in fixed_text and '"dates": {}' not in fixed_text:
+                        fixed_text = fixed_text.replace('"dates": {', '"dates": {}')
+                    if '"entities": {' in fixed_text and '"entities": {}' not in fixed_text:
+                        fixed_text = fixed_text.replace('"entities": {', '"entities": {}')
+                    
+                    return json.loads(fixed_text)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse JSON response: {e}\nResponse text: {response_text}")
+                    return {"error": "Invalid JSON response"}
+            
+        except Exception as e:
+            logger.error(f"Ollama API request failed: {e}")
             raise

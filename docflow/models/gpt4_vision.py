@@ -1,14 +1,15 @@
 """
 GPT-4 Vision Model Implementation
-Provides document analysis using OpenAI's GPT-4 Vision model
+Provides document analysis using GPT-4 Vision model via OpenAI API
 """
+from typing import Dict, Any, Optional, List
 import os
 import base64
-from typing import Dict, Any, Optional
-from openai import OpenAI
-from . import BaseModel, ModelRegistry
-import logging
 import json
+from openai import OpenAI
+import logging
+from ..models import BaseModel
+from . import ModelRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -17,122 +18,98 @@ class GPT4VisionModel(BaseModel):
     description = "GPT-4 Vision model for advanced document analysis"
     requires_env_vars = ['OPENAI_API_KEY']
 
-    # Document analysis schema
-    ANALYSIS_SCHEMA = {
-        "document_type": "Type of document (invoice, contract, report, etc.)",
-        "content_summary": "Brief summary of the document content",
-        "key_information": {
-            "dates": ["List of important dates found"],
-            "amounts": ["List of monetary amounts"],
-            "reference_numbers": ["Document reference numbers, invoice numbers, etc."],
-        },
-        "entities": {
-            "organizations": ["Company names"],
-            "people": ["Person names"],
-            "locations": ["Location names"]
-        },
-        "metadata": {
-            "total_amount": "Total amount if present",
-            "due_date": "Payment due date if present",
-            "document_date": "Document creation/issue date"
-        }
-    }
-
     def __init__(self):
         """Initialize the model with configuration from environment"""
+        super().__init__()
         self.api_key = os.getenv('OPENAI_API_KEY')
         self.model = os.getenv('GPT4_VISION_MODEL', 'gpt-4-turbo')
         self.client = OpenAI(api_key=self.api_key)
         self.max_tokens = int(os.getenv('GPT4_MAX_TOKENS', '1000'))
         self.temperature = float(os.getenv('GPT4_TEMPERATURE', '0.2'))
-        self.prompt_template = os.getenv('GPT4_PROMPT_TEMPLATE', 
-            """Analyze this document and extract key information according to this schema:
-            {schema}
+        self.schema = self._load_schema()
 
-            Provide ONLY a JSON response following the schema exactly, no additional text.
-            Focus on accuracy and completeness of the extracted information.""")
+    def _load_schema(self) -> dict:
+        """Load JSON schema from file"""
+        schema_path = os.getenv('DOCFLOW_SCHEMA_PATH', 'config/schema.json')
+        try:
+            with open(schema_path, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            logger.error(f"Failed to load schema from {schema_path}: {e}")
+            raise
 
-    @classmethod
-    def is_available(cls) -> bool:
-        """Check if OpenAI API key is configured"""
-        api_key = os.getenv('OPENAI_API_KEY')
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f"Checking GPT-4 Vision availability: API key {'present' if api_key else 'missing'}")
-        return bool(api_key)
+    def _get_prompt_template(self, text: str) -> str:
+        """Get the prompt template for document analysis"""
+        return f"""Analyze this document and extract the key information according to this exact schema:
+
+{json.dumps(self.schema, indent=2)}
+
+Document to analyze:
+{text}
+
+Requirements:
+1. Use YYYY-MM-DD for all dates
+2. Use numbers for amounts (not strings)
+3. Provide ONLY the JSON response, no additional text"""
+
+    def _encode_image(self, image_path: str) -> str:
+        """Encode image to base64"""
+        with open(image_path, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode('utf-8')
 
     def extract_information(self, text: str, image_path: Optional[str] = None) -> Dict[str, Any]:
-        """Extract information using GPT-4 Vision model"""
+        """Extract information from text and/or image using GPT-4 Vision"""
         try:
-            messages = []
-
-            # Prepare system message with schema
-            messages.append({
-                "role": "system",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": self.prompt_template.format(
-                            schema=json.dumps(self.ANALYSIS_SCHEMA, indent=2)
-                        )
-                    }
-                ]
-            })
-
-            # Prepare user message with content
-            user_content = []
-
-            # Add text content if available
-            if text:
-                user_content.append({
-                    "type": "text",
-                    "text": f"Document text content:\n{text}"
-                })
-
+            messages = [{"role": "system", "content": "You are a document analysis expert."}]
+            
+            # Prepare the content parts
+            content_parts: List[Dict] = [{"type": "text", "text": self._get_prompt_template(text)}]
+            
             # Add image if available
             if image_path:
+                base64_image = self._encode_image(image_path)
+                content_parts.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{base64_image}",
+                        "detail": "high"
+                    }
+                })
+            
+            messages.append({"role": "user", "content": content_parts})
+
+            # Make the API request
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                max_tokens=self.max_tokens,
+                temperature=self.temperature,
+                response_format={"type": "json_object"}
+            )
+
+            # Parse the response
+            if response.choices and response.choices[0].message.content:
                 try:
-                    with open(image_path, "rb") as image_file:
-                        base64_image = base64.b64encode(image_file.read()).decode('utf-8')
-                        user_content.append({
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{base64_image}"
-                            }
-                        })
-                except Exception as e:
-                    logger.error(f"Error processing image {image_path}: {e}")
-                    # Continue with text-only analysis if image processing fails
-                    pass
-
-            messages.append({
-                "role": "user",
-                "content": user_content
-            })
-
-            # Make request to OpenAI API
-            try:
-                if logger.isEnabledFor(logging.DEBUG):
-                    logger.debug(f"Making OpenAI API request with model: {self.model}")
-
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    max_tokens=self.max_tokens,
-                    temperature=self.temperature,
-                    response_format={"type": "json_object"}
-                )
-
-                analysis = json.loads(response.choices[0].message.content)
-
+                    result = json.loads(response.choices[0].message.content)
+                    return {
+                        "raw_analysis": result,
+                        "model_name": self.model,
+                        "success": True
+                    }
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse GPT-4 Vision response: {e}")
+                    return {
+                        "success": False,
+                        "error": "Invalid JSON response",
+                        "model_name": self.model
+                    }
+            else:
+                logger.error("Empty response from GPT-4 Vision")
                 return {
-                    "raw_analysis": analysis,
-                    "model_name": self.model,
-                    "success": True
+                    "success": False,
+                    "error": "Empty response",
+                    "model_name": self.model
                 }
-
-            except Exception as e:
-                logger.error(f"OpenAI API request failed: {e}")
-                raise Exception(f"Failed to communicate with OpenAI API: {str(e)}")
 
         except Exception as e:
             logger.error(f"Error in GPT-4 Vision analysis: {e}")
@@ -141,6 +118,13 @@ class GPT4VisionModel(BaseModel):
                 "error": str(e),
                 "model_name": self.model
             }
+
+    @classmethod
+    def is_available(cls) -> bool:
+        """Check if the model is available"""
+        api_key_present = bool(os.getenv('OPENAI_API_KEY'))
+        logger.debug(f"Checking GPT-4 Vision availability: API key present")
+        return api_key_present
 
 # Register the GPT-4 Vision model
 ModelRegistry.register("gpt4-vision", GPT4VisionModel)

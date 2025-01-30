@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Document Parsing Result Schema",
+  "type": "object",
+  "properties": {
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "The document date, properly formatted as YYYY-MM-DD"
+    },
+    "title": {
+      "type": "string",
+      "description": "A short description or title for the document"
+    },
+    "doctype": {
+      "type": "string",
+      "enum": ["invoice", "contract", "report", "other"],
+      "description": "Type of document (invoice, contract, report, etc.)"
+    },
+    "reference": {
+      "type": ["string", "null"],
+      "description": "The document number, if present"
+    },
+    "meta": {
+      "type": "object",
+      "properties": {
+        "dates": {
+          "type": "object",
+          "patternProperties": {
+            "^[a-zA-Z_]+$": {
+              "type": "string",
+              "format": "date",
+              "description": "A date with a descriptive label (e.g., duedate, orderdate)"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Key-value pairs of important dates with descriptive labels"
+        },
+        "amounts": {
+          "type": "object",
+          "patternProperties": {
+            "^[a-zA-Z_]+$": {
+              "type": "number",
+              "description": "A monetary amount with a descriptive label (e.g., total, tax)"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Key-value pairs of monetary amounts with descriptive labels"
+        },
+        "entities": {
+          "type": "object",
+          "properties": {
+            "organizations": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Company names"
+            },
+            "people": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Person names"
+            }
+          },
+          "required": ["organizations", "people"],
+          "additionalProperties": false,
+          "description": "Entities extracted from the document"
+        }
+      },
+      "required": [],
+      "additionalProperties": false,
+      "description": "Additional metadata extracted from the document"
+    }
+  },
+  "required": ["date", "title", "doctype"],
+  "additionalProperties": false
+}
