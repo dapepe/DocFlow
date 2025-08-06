@@ -10,6 +10,7 @@ from openai import OpenAI
 import logging
 from ..models import BaseModel
 from . import ModelRegistry
+from ..prompt_manager import prompt_manager
 
 logger = logging.getLogger(__name__)
 
@@ -38,19 +39,16 @@ class GPT4VisionModel(BaseModel):
             logger.error(f"Failed to load schema from {schema_path}: {e}")
             raise
 
-    def _get_prompt_template(self, text: str) -> str:
-        """Get the prompt template for document analysis"""
-        return f"""Analyze this document and extract the key information according to this exact schema:
-
-{json.dumps(self.schema, indent=2)}
-
-Document to analyze:
-{text}
-
-Requirements:
-1. Use YYYY-MM-DD for all dates
-2. Use numbers for amounts (not strings)
-3. Provide ONLY the JSON response, no additional text"""
+    def _get_enhanced_prompt(self, text: str, document_type: str = None, file_extension: str = None) -> str:
+        """Get enhanced prompt using the configurable prompt system"""
+        model_instructions = prompt_manager.get_model_specific_instructions('gpt4-vision')
+        return prompt_manager.generate_prompt(
+            document_text=text,
+            schema=self.schema,
+            document_type=document_type,
+            file_extension=file_extension,
+            model_specific_instructions=model_instructions
+        )
 
     def _encode_image(self, image_path: str) -> str:
         """Encode image to base64"""
@@ -63,7 +61,7 @@ Requirements:
             messages = [{"role": "system", "content": "You are a document analysis expert."}]
             
             # Prepare the content parts
-            content_parts: List[Dict] = [{"type": "text", "text": self._get_prompt_template(text)}]
+            content_parts: List[Dict] = [{"type": "text", "text": self._get_enhanced_prompt(text)}]
             
             # Add image if available
             if image_path:

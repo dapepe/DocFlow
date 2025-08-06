@@ -1,150 +1,351 @@
 # DocFlow Document Processor
 
-DocFlow is an advanced document processing system that supports PDF, DOCX, and TXT files with AI-powered features for metadata extraction, document classification, and OCR capabilities.
+DocFlow is an advanced document processing system that supports PDF, DOCX, TXT, and image files with AI-powered features for metadata extraction, document classification, and OCR capabilities. Features configurable prompts, multiple AI model support, and enterprise-grade document analysis.
 
-## Features
+## 🚀 Features
 
-- AI-powered document classification using multiple model providers
-- Metadata extraction (dates, amounts, invoice numbers, etc.)
-- OCR support for PDF files
-- REST API with FastAPI
-- Command-line interface
-- Rich console output
-- Multiple AI model support:
-  - GPT-4 Vision
-  - Grok Vision
-  - LLaVA
-  - Llama Vision
-  - Fallback model for offline use
-- Configurable model selection and fallback behavior
+### Core Capabilities
+- **Multi-format Support**: PDF, DOCX, TXT, JPG, PNG image files
+- **AI-Powered Analysis**: Advanced document classification and metadata extraction
+- **OCR Integration**: Built-in OCR for image documents and scanned PDFs
+- **Configurable Prompts**: Customizable prompt templates with placeholder support
+- **REST API**: FastAPI-based with automatic documentation
+- **Command-line Interface**: Rich console output with verbose logging
+- **Enterprise Ready**: Docker support, comprehensive logging, error handling
 
-## Requirements
+### AI Model Support
+- **🎯 Qwen2.5 Vision** (qwen-vision) - Default model with advanced multilingual capabilities
+- **💎 Granite3.2 Vision** (granite-vision) - IBM's enterprise document understanding
+- **⚡ Gemma3** (gemma) - Google's efficient 12B parameter model
+- **🦙 LLaVA** (llava) - Popular vision-language model
+- **🦙 Llama Vision** (llama-vision) - Meta's balanced vision-text analysis
+- **🔬 Mistral Document AI** (mistral-document) - Advanced OCR and document processing
+- **🧠 GPT-4 Vision** (gpt4-vision) - OpenAI's premier vision model
+- **⚙️ Fallback Model** (fallback) - Rule-based processing for offline use
 
-- Python 3.11+
-- System dependencies:
-  - Poppler (for PDF processing)
-  - Pillow (for image processing)
-- Python dependencies (see requirements.txt):
-  - Core: fastapi, uvicorn, click, rich
-  - Document processing: pypdf2, python-docx, pdf2image
-  - AI models: openai, ollama, google-generativeai
-  - Utilities: pyyaml, python-dateutil, trafilatura
+## 📋 Requirements
 
-## Configuration
+- **Python**: 3.11+
+- **System Dependencies**:
+  - Poppler (PDF processing)
+  - Pillow (image processing)
+- **AI Services** (optional):
+  - Ollama (local models)
+  - OpenAI API (GPT-4)
+  - Mistral API
+  - Google API (Gemini)
 
-### Logging
+## ⚙️ Configuration
 
-Logging is configured in `config/logging.yaml` with:
-- Console and file output
-- Debug level for docflow modules
-- Standard format with timestamps
+### Environment Variables
 
-### Document Rules
-
-Document processing rules are defined in `config/rules.yaml` with:
-- Document type detection based on keywords
-- Metadata fields to extract for each document type
-- Supported document types: invoice, receipt, contract
-
-Environment variables can be configured in the `.env` file. Here are all available configuration options:
+Create a `.env` file from `env.template.txt`:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| PORT | API server port | 8000 |
-| HOST | API server host | 0.0.0.0 |
-| PRIMARY_MODEL | Primary AI model to use (llava, llama-vision, gpt4-vision, gemini, or fallback) | llava |
-| OLLAMA_HOST | Ollama API host URL | http://localhost:11434 |
-| OLLAMA_TIMEOUT | Timeout in seconds for Ollama API calls | 40 |
-| OLLAMA_TEMPERATURE | Temperature setting for Ollama models | 0.2 |
-| OPENAI_API_KEY | OpenAI API key (required for GPT-4 Vision) | - |
-| GOOGLE_API_KEY | Google API key (required for Gemini) | - |
-| XAI_API_KEY | xAI API key (required for Grok Vision) | - |
-| LOG_LEVEL | Logging level (DEBUG, INFO, WARNING, ERROR) | INFO |
-| LOG_FILE | Log file path | docflow.log |
-| MAX_FILE_SIZE | Maximum file size in bytes | 10485760 (10MB) |
-| ENABLE_OCR | Enable OCR processing for PDFs | true |
-| TEMP_DIR | Directory for temporary files | /tmp/docflow |
-| DOCFLOW_LOG_LEVEL | Detailed logging level for DocFlow modules | ERROR |
-| OLLAMA_LLAVA_MODEL | Model name for LLaVA | llava:latest |
-| OLLAMA_LLAMA_VISION_MODEL | Model name for Llama Vision | llama3.2-vision:latest |
-| GROK_MODEL | Model name for Grok Vision | grok-2-vision-1212 |
-| FALLBACK_CONFIDENCE_THRESHOLD | Confidence threshold for fallback model | 0.6 |
+| **API Configuration** |
+| `PORT` | API server port | 8000 |
+| `HOST` | API server host | 0.0.0.0 |
+| `PRIMARY_MODEL` | Default AI model | qwen-vision |
+| **Ollama Models** |
+| `OLLAMA_HOST` | Ollama API host URL | http://localhost:11434 |
+| `OLLAMA_TIMEOUT` | Request timeout in seconds | 60 |
+| `OLLAMA_TEMPERATURE` | Model temperature | 0.2 |
+| `OLLAMA_QWEN_VISION_MODEL` | Qwen model name | qwen2.5vl:7b |
+| `OLLAMA_GRANITE_VISION_MODEL` | Granite model name | granite3.2-vision:latest |
+| `OLLAMA_GEMMA_MODEL` | Gemma model name | gemma3:12b |
+| `OLLAMA_LLAVA_MODEL` | LLaVA model name | llava:latest |
+| `OLLAMA_LLAMA_VISION_MODEL` | Llama Vision model name | llama3.2-vision:latest |
+| **API Keys** |
+| `OPENAI_API_KEY` | OpenAI API key (for GPT-4) | - |
+| `MISTRAL_API_KEY` | Mistral API key | - |
+| `GOOGLE_API_KEY` | Google API key (for Gemini) | - |
+| **Advanced Configuration** |
+| `DOCFLOW_SCHEMA_PATH` | JSON schema file path | config/schema.json |
+| `DOCFLOW_LOG_LEVEL` | Logging level | ERROR |
+| `MAX_FILE_SIZE` | Max file size (bytes) | 10485760 (10MB) |
 
-### Model-Specific Requirements
+### Configurable Prompts
 
-- **GPT-4 Vision**: Requires `OPENAI_API_KEY`
-- **Gemini**: Requires `GOOGLE_API_KEY`
-- **Grok Vision**: Requires `XAI_API_KEY`
-- **LLaVA/Llama Vision**: Requires Ollama to be installed and running locally or at specified `OLLAMA_HOST`
-- **Fallback Model**: No specific requirements (always available)
+DocFlow uses a sophisticated prompt system with `config/prompt.txt` supporting:
 
-## Getting Started
+**Available Placeholders:**
+- `{document_text}` - Extracted document content
+- `{schema_json}` - JSON schema for structured output  
+- `{context_hints}` - Document-type specific analysis hints
+- `{document_type}` - Detected document type
+- `{file_extension}` - File format for processing hints
+- `{model_instructions}` - Model-specific optimization instructions
 
-1. Install system dependencies:
+**Features:**
+- Document-type specific context hints (invoice, receipt, contract, etc.)
+- Model-specific instructions for optimal performance
+- File-format specific processing guidance
+- Advanced validation and quality standards
+
+### Document Rules
+
+Configure document classification in `config/rules.yaml`:
+
+```yaml
+rules:
+  invoice:
+    keywords: ["invoice", "bill", "payment due"]
+    metadata_fields:
+      invoice_number:
+        pattern: "Invoice No\\.?:\\s*([A-Za-z0-9-/]+)"
+        type: "String"
+      total_amount:
+        pattern: "Total[\\s:]+\\$?([0-9,\\.]+)"
+        type: "Float"
+      date:
+        pattern: "Date[\\s:]+([0-9/\\-]+)"
+        type: "Date"
+```
+
+## 🚀 Getting Started
+
+### 1. System Dependencies
 
 ```bash
-# MacOS
+# macOS
 brew install poppler
 
-# Windows
+# Windows  
 choco install poppler
 
-# Linux
+# Ubuntu/Debian
 sudo apt-get install poppler-utils
+
+# CentOS/RHEL
+sudo yum install poppler-utils
 ```
 
-2. Install Python dependencies:
+### 2. Python Setup
 
 ```bash
+# Install dependencies
 pip install -r requirements.txt
+
+# Copy environment template
+cp env.template.txt .env
+
+# Edit configuration
+nano .env
 ```
 
-3. Configure AI models in `config/models.yaml` (see example below)
+### 3. AI Model Setup
 
-4. Run the application:
+**For Ollama Models (Local):**
+```bash
+# Install Ollama
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# Pull required models
+ollama pull qwen2.5vl:7b
+ollama pull granite3.2-vision:latest
+ollama pull gemma3:12b
+ollama pull llava:latest
+ollama pull llama3.2-vision:latest
+```
+
+**For API Models:**
+- Add your API keys to `.env`
+- OpenAI: `OPENAI_API_KEY=sk-...`
+- Mistral: `MISTRAL_API_KEY=your_key`
+
+### 4. Run the Application
 
 ```bash
 # Start API server
-uvicorn docflow.api:app --reload
+python main.py serve --host 0.0.0.0 --port 8000
 
-# Process document via CLI
-python main.py process path/to/document.pdf --ocr
+# Process single document
+python main.py process document.pdf --model qwen-vision --verbose
+
+# List available models
+python main.py models
 ```
 
-### Run with Docker
-
-Running with Docker:
-
-```bash
-docker build -t docflow .
-```
-
-Run the Docker Container
-
-```bash
-docker run -p 8000:8000 docflow
-```
-
-Run as service with Docker Compose:
-
-```bash
-docker-compose up
-```
-
-## Usage
+## 🔧 Usage
 
 ### REST API
 
-The API server starts automatically and is available at port 8000. Access the API documentation at:
-- Swagger UI: `/docs`
-- ReDoc: `/redoc`
+Access comprehensive API documentation:
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
 
-Example API endpoints:
-- `GET /` - API information
-- `POST /process` - Process documents
+**Key Endpoints:**
+```bash
+# Get available models
+GET /models
+
+# Process document
+POST /process
+  - file: document file
+  - model: AI model choice
+  - use_ocr: enable OCR
+  - include_text: return extracted text
+```
+
+**Example API Call:**
+```bash
+curl -X POST "http://localhost:8000/process" \
+  -F "file=@invoice.pdf" \
+  -F "model=qwen-vision" \
+  -F "use_ocr=true"
+```
 
 ### Command Line Interface
 
-Process a single document:
+**Process Documents:**
 ```bash
-python main.py process path/to/document.pdf --ocr
+# Basic processing
+./process.sh document.pdf
+
+# With specific model
+./process.sh document.pdf --model granite-vision
+
+# Enable OCR and save results
+./process.sh scan.jpg --use-ocr --output results.json
+
+# Verbose logging
+./process.sh contract.pdf --model mistral-document --verbose
+```
+
+**Available Models:**
+- `qwen-vision` (Default) - Qwen2.5VL multimodal model
+- `granite-vision` - IBM Granite3.2 enterprise model
+- `gemma` - Google Gemma3 12B efficient model
+- `llava` - Popular vision-language model
+- `llama-vision` - Meta Llama3.2 vision model
+- `mistral-document` - Mistral with OCR capabilities
+- `gpt4-vision` - OpenAI GPT-4 Vision (requires API key)
+- `fallback` - Rule-based processing (offline)
+
+**Advanced Options:**
+```bash
+# Save extracted text separately
+./process.sh document.pdf --save-text extracted.txt
+
+# Include full text in output
+./process.sh document.pdf --include-text
+
+# Custom output path
+./process.sh document.pdf --output analysis.json
+```
+
+## 🐳 Docker Deployment
+
+### Standard Docker
+
+```bash
+# Build image
+docker build -t docflow .
+
+# Run container
+docker run -p 8000:8000 \
+  -e OLLAMA_HOST=http://host.docker.internal:11434 \
+  -v ./documents:/app/documents \
+  docflow
+```
+
+### Docker Compose
+
+```bash
+# Start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+```
+
+## 🏗️ Architecture
+
+### Model Registry System
+Dynamic model loading with automatic availability detection:
+
+```python
+from docflow.models import ModelRegistry
+
+# List available models
+models = ModelRegistry.list_models()
+
+# Get specific model
+model = ModelRegistry.get_model("qwen-vision")
+```
+
+### Prompt Management
+Centralized prompt system with advanced templating:
+
+```python
+from docflow.prompt_manager import prompt_manager
+
+# Generate enhanced prompt
+prompt = prompt_manager.generate_prompt(
+    document_text=text,
+    schema=schema,
+    document_type="invoice",
+    model_specific_instructions="Focus on accuracy"
+)
+```
+
+### Processing Pipeline
+1. **Document Upload** → File validation and temporary storage
+2. **Text Extraction** → Format-specific text extraction with OCR
+3. **Document Classification** → Rule-based initial classification
+4. **AI Analysis** → Selected model processes with enhanced prompts
+5. **Response Processing** → Validation and structured output
+6. **Result Return** → JSON response with metadata and analysis
+
+## 🔍 Advanced Features
+
+### Response Validation
+- JSON schema validation
+- Data type checking
+- Cross-field consistency validation
+- Confidence scoring
+
+### Performance Optimizations
+- Concurrent model processing
+- Intelligent caching
+- Request batching for APIs
+- Optimized prompt templates
+
+### Error Handling
+- Graceful model fallbacks
+- Retry mechanisms with backoff
+- Comprehensive error logging
+- User-friendly error messages
+
+### Monitoring & Observability
+- Structured logging with context
+- Performance metrics
+- Model availability monitoring
+- Request/response tracing
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests and documentation
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🆘 Support
+
+- **Documentation**: Check this README and API docs
+- **Issues**: Report bugs via GitHub Issues  
+- **Questions**: Use GitHub Discussions
+- **Enterprise**: Contact for enterprise support
+
+---
+
+**Built with ❤️ using FastAPI, Ollama, and modern AI models**

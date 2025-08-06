@@ -21,22 +21,14 @@ class LLaVAModel(OllamaBaseModel):
         """Get the LLaVA model name"""
         return os.getenv('OLLAMA_LLAVA_MODEL', 'llava:latest')
 
-    def _get_prompt_template(self, text: str) -> str:
-        """Get the prompt template for document analysis"""
-        return f"""Analyze this document and extract the key information according to the provided schema.
-
-Document to analyze:
-{text}
-
-Requirements:
-1. Use YYYY-MM-DD for all dates
-2. Use numbers for amounts (not strings)
-3. Provide ONLY the JSON response, no additional text"""
+    def _get_enhanced_prompt(self, text: str, document_type: str = None, file_extension: str = None) -> str:
+        """Get enhanced prompt using the configurable prompt system"""
+        return self._generate_enhanced_prompt(text, document_type, file_extension)
 
     def extract_information(self, text: str, image_path: Optional[str] = None) -> Dict[str, Any]:
         """Extract information from text and/or image using LLaVA"""
         try:
-            prompt = self._get_prompt_template(text)
+            prompt = self._get_enhanced_prompt(text)
             
             # Add image if available
             if image_path:

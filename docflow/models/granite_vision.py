@@ -1,6 +1,6 @@
 """
-Llama Vision Model Implementation
-Provides document analysis using Llama Vision model via Ollama
+Granite3.2 Vision Model Implementation
+Provides document analysis using Granite3.2 Vision model via Ollama
 """
 from .ollama_base import OllamaBaseModel
 from . import ModelRegistry
@@ -11,21 +11,21 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class LlamaVisionModel(OllamaBaseModel):
-    """Llama Vision model using Ollama for document analysis"""
-    description = "Llama Vision model for advanced document analysis"
+class GraniteVisionModel(OllamaBaseModel):
+    """Granite3.2 Vision model using Ollama for document analysis"""
+    description = "Granite3.2 Vision model for advanced document analysis"
 
     @classmethod
     def _get_model_name(cls) -> str:
-        """Get the Llama Vision model name"""
-        return os.getenv('OLLAMA_LLAMA_VISION_MODEL', 'llama3.2-vision:latest')
+        """Get the Granite Vision model name"""
+        return os.getenv('OLLAMA_GRANITE_VISION_MODEL', 'granite3.2-vision:latest')
 
     def _get_enhanced_prompt(self, text: str, document_type: str = None, file_extension: str = None) -> str:
         """Get enhanced prompt using the configurable prompt system"""
         return self._generate_enhanced_prompt(text, document_type, file_extension)
 
     def extract_information(self, text: str, image_path: Optional[str] = None) -> Dict[str, Any]:
-        """Extract information from text and/or image using Llama Vision"""
+        """Extract information from text and/or image using Granite Vision"""
         try:
             prompt = self._get_enhanced_prompt(text)
             
@@ -45,20 +45,20 @@ class LlamaVisionModel(OllamaBaseModel):
                     "success": True
                 }
             else:
-                logger.error(f"Invalid response from Llama Vision: {response}")
+                logger.error(f"Invalid response from Granite Vision: {response}")
                 return {
                     "success": False,
-                    "error": "Failed to get valid response from Llama Vision",
+                    "error": "Failed to get valid response from Granite Vision",
                     "model_name": self.model
                 }
                 
         except Exception as e:
-            logger.error(f"Error in Llama Vision analysis: {e}")
+            logger.error(f"Error in Granite Vision analysis: {e}")
             return {
                 "success": False,
                 "error": str(e),
                 "model_name": self.model
             }
 
-# Register the Llama Vision model
-ModelRegistry.register("llama-vision", LlamaVisionModel)
+# Register the Granite Vision model
+ModelRegistry.register("granite-vision", GraniteVisionModel)

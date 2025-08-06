@@ -71,8 +71,8 @@ def models(verbose):
 @click.option('--output', '-o', type=click.Path(), help="Output file path for JSON results")
 @click.option('--model', '-m', 
               type=click.Choice(get_available_models(), case_sensitive=False),
-              default=lambda: os.getenv('PRIMARY_MODEL', 'fallback'),  # Default from environment or fallback
-              help="Choose AI model for analysis")
+              default=lambda: os.getenv('PRIMARY_MODEL', 'qwen-vision'),  # Default from environment or qwen-vision
+              help="Choose AI model for document analysis. Available: qwen-vision (Qwen2.5VL), granite-vision (Granite3.2), gemma (Gemma3), llava (LLaVA), llama-vision (Llama3.2), mistral-document (Mistral+OCR), gpt4-vision (OpenAI), openrouter-claude (Claude via OpenRouter), openrouter-gpt4-vision (GPT-4V via OpenRouter), openrouter-gemini-flash (Gemini Flash via OpenRouter), openrouter-gemini-pro (Gemini Pro via OpenRouter), openrouter-qwen-vl (Qwen-VL via OpenRouter), openrouter-pixtral (Pixtral via OpenRouter), openrouter-llava (LLaVA via OpenRouter), fallback (basic)")
 @click.option('--include-text', is_flag=True, help="Display the extracted text content")
 @click.option('--save-text', type=click.Path(), help="Save extracted text to a separate file")
 @verbose_option

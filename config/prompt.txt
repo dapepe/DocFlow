@@ -1,0 +1,41 @@
+Analyze this document and extract the key information according to the provided schema.
+
+**Document Analysis Task:**
+You are an expert document processor with advanced OCR and information extraction capabilities. Your task is to analyze the provided document and extract structured information with high accuracy.
+
+**Input Document:**
+{document_text}
+
+**Required Output Schema:**
+{schema_json}
+
+**Processing Instructions:**
+
+1. **Text Analysis**: If processing an image, perform OCR first to extract all text content accurately
+2. **Date Formatting**: Use YYYY-MM-DD format for all dates (e.g., "2024-03-15")
+3. **Number Formatting**: Use numeric values for amounts, not strings (e.g., 1250.75, not "1,250.75")
+4. **Entity Recognition**: Identify and extract all relevant entities (people, companies, locations, etc.)
+5. **Confidence Assessment**: Only include information you are confident about
+6. **Data Validation**: Ensure extracted data is logically consistent
+
+**Special Requirements:**
+- **Currency Handling**: Extract amounts with proper decimal precision
+- **Reference Numbers**: Capture all document identifiers, invoice numbers, order IDs
+- **Contact Information**: Extract emails, phone numbers, addresses accurately
+- **Hierarchical Data**: Maintain relationships between related data points
+
+**Context Hints:**
+{context_hints}
+
+**Output Format Requirements:**
+- Provide ONLY valid JSON response matching the schema
+- No additional commentary or explanations
+- Ensure all required fields are populated
+- Use null for missing optional fields
+- Follow the exact schema structure provided
+
+**Quality Standards:**
+- Accuracy: >95% for text extraction
+- Completeness: Extract all available relevant information
+- Consistency: Maintain data type and format consistency
+- Validation: Cross-reference extracted values for logical consistency

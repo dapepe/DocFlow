@@ -11,6 +11,9 @@ from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
 import json
 import re
+from ..prompt_manager import prompt_manager
+from ..response_validator import ResponseValidator
+from ..performance_optimizer import cached_model_response, optimize_text_extraction
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +39,8 @@ class OllamaBaseModel(BaseModel):
         self.model = self._get_model_name()
         self.session = self._setup_requests_session()
         self.schema = self._load_schema()
-        logger.info(f"Initialized Ollama model: {self.model} with schema")
+        self.validator = ResponseValidator(self.schema)
+        logger.info(f"Initialized Ollama model: {self.model} with schema and validator")
 
     def _load_config(self) -> Dict[str, Any]:
         """Load configuration from environment variables with defaults"""
@@ -129,42 +133,20 @@ class OllamaBaseModel(BaseModel):
             logger.error(f"Failed to load schema from {schema_path}: {e}")
             raise
 
-    def _generate_prompt_from_schema(self) -> str:
-        """Generate a prompt from the JSON schema"""
-        required_fields = self.schema.get('required', [])
-        properties = self.schema.get('properties', {})
+    def _generate_enhanced_prompt(self, text: str, document_type: Optional[str] = None, 
+                                 file_extension: Optional[str] = None) -> str:
+        """Generate an enhanced prompt using the configurable prompt system"""
+        model_instructions = prompt_manager.get_model_specific_instructions(
+            self.__class__.__name__.replace('Model', '').lower().replace('ollama', '').replace('base', '')
+        )
         
-        prompt_parts = ["Please analyze this document and provide information in the following format:"]
-        
-        # Add required fields first
-        prompt_parts.append("\nRequired fields:")
-        for field in required_fields:
-            field_info = properties.get(field, {})
-            description = field_info.get('description', '')
-            prompt_parts.append(f"- {field}: {description}")
-
-        # Add metadata fields
-        if 'meta' in properties:
-            meta_props = properties['meta'].get('properties', {})
-            prompt_parts.append("\nMetadata fields:")
-            
-            # Dates
-            if 'dates' in meta_props:
-                prompt_parts.append("- dates: Key-value pairs of important dates")
-            
-            # Amounts
-            if 'amounts' in meta_props:
-                prompt_parts.append("- amounts: Key-value pairs of monetary amounts")
-            
-            # Entities
-            if 'entities' in meta_props:
-                entities_props = meta_props['entities'].get('properties', {})
-                prompt_parts.append("- entities:")
-                for entity_type, entity_info in entities_props.items():
-                    description = entity_info.get('description', '')
-                    prompt_parts.append(f"  - {entity_type}: {description}")
-
-        return "\n".join(prompt_parts)
+        return prompt_manager.generate_prompt(
+            document_text=text,
+            schema=self.schema,
+            document_type=document_type,
+            file_extension=file_extension,
+            model_specific_instructions=model_instructions
+        )
 
     def _make_request(self, prompt: str) -> Dict[str, Any]:
         """Make a request to Ollama API with proper formatting"""
