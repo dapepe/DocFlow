@@ -10,6 +10,11 @@ import logging
 import os
 from .models import ModelRegistry
 
+# Import enhanced CLI features
+from .enhanced_cli import enhanced_cli, show_interactive_menu
+from .cli_workflows import workflow, smart_route, insights
+from .cli_help import help as help_cmd
+
 console = Console()
 logger = logging.getLogger(__name__)
 
@@ -43,11 +48,23 @@ def verbose_option(f):
                        help="Enable verbose logging",
                        callback=callback)(f)
 
-@click.group()
+@click.group(invoke_without_command=True)
+@click.option('--version', '-v', is_flag=True, help="Show version information")
 @verbose_option
-def cli(verbose):
-    """DocFlow - Document Processing Tool"""
-    pass
+@click.pass_context
+def cli(ctx, version, verbose):
+    """🚀 DocFlow - Advanced AI-Powered Document Processing Tool"""
+    if version:
+        console.print(Panel(
+            "[bold blue]DocFlow v2.0[/bold blue]\n"
+            "Advanced AI-Powered Document Processing\n"
+            "🎯 15+ AI Models | 🔥 Smart Processing | ⚡ Enterprise Ready",
+            title="Version Info"
+        ))
+        return
+    
+    if ctx.invoked_subcommand is None:
+        show_interactive_menu()
 
 @cli.command()
 @verbose_option
@@ -151,3 +168,9 @@ def serve(host: str, port: int, verbose: bool):
     except Exception as e:
         console.print(f"[red]Error starting server:[/red] {str(e)}")
         logger.error(f"Server startup error: {e}")
+
+# Add advanced workflow commands
+cli.add_command(workflow)
+cli.add_command(smart_route)
+cli.add_command(insights)
+cli.add_command(help_cmd)
