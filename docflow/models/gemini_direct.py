@@ -14,8 +14,8 @@ import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 from ..models import BaseModel
 from . import ModelRegistry
-from ...prompt_manager import prompt_manager
-from ...response_validator import ResponseValidator
+from ..prompt_manager import prompt_manager
+from ..response_validator import ResponseValidator
 
 logger = logging.getLogger(__name__)
 
