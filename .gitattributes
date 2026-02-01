@@ -1,0 +1,45 @@
+# Git Line Ending Configuration
+# Force LF line endings on all text files for Linux consistency
+
+* text=auto eol=lf
+
+# Specific extensions that are text
+*.py text eol=lf
+*.txt text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.cfg text eol=lf
+*.conf text eol=lf
+*.ini text eol=lf
+*.toml text eol=lf
+*.toml text eol=lf
+*.sh text eol=lf
+*.bash text eol=lf
+*.zsh text eol=lf
+*.fish text eol=lf
+
+# Don't normalize binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary
+*.DS_Store binary
+*.lock binary
+*.db binary
+*.sqlite binary
+*.class binary
+*.pyc binary
+*.pyo binary
+*.so binary
+*.dll binary
+*.dylib binary
+*.jar binary
+
+# Text files with special handling
+.env text eol=lf
+.gitignore text eol=lf
+README.md text eol=lf
+LICENSE text eol=lf
