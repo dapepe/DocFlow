@@ -19,6 +19,9 @@ pillow>=10.0.0
 # llama.cpp support (requires build tools: cmake, build-essential)
 llama-cpp-python>=0.3.0
 
+# Layout processing (optional but recommended)
+pdfplumber>=0.11.0
+
 # Optional: GPU memory detection for auto-configuration
 # pynvml>=11.0.0
 
