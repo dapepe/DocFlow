@@ -6,6 +6,13 @@ Provides unified provider architecture for different LLM backends:
 - HTTP-based providers for API models
 """
 
+from .base import BaseProvider, HTTPProvider, LocalProvider, ProviderCapabilities
 from .llama_cpp_provider import LlamaCppProvider
 
-__all__ = ["LlamaCppProvider"]
+__all__ = [
+    "BaseProvider",
+    "HTTPProvider",
+    "LocalProvider",
+    "ProviderCapabilities",
+    "LlamaCppProvider",
+]

@@ -1,0 +1,298 @@
+"""
+Unified Provider Architecture
+
+Provides base classes and interfaces for all LLM providers.
+This architecture makes it easy to add new backends (vLLM, TGI, etc.)
+by implementing the BaseProvider interface.
+"""
+
+from abc import ABC, abstractmethod
+from typing import Dict, Any, Optional, List
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class ProviderCapabilities:
+    """Standard capability flags for all providers."""
+
+    def __init__(self):
+        self.vision = False
+        self.multilingual = False
+        self.streaming = False
+        self.structured_output = False
+        self.local = False
+        self.gpu_acceleration = False
+        self.long_context = False
+        self.reasoning = False
+        self.ocr = False
+        self.fast = False
+        self.document_specialized = False
+
+
+class BaseProvider(ABC):
+    """
+    Abstract base class for all LLM providers.
+
+    All provider implementations (Ollama, llama.cpp, Anthropic, Google, etc.)
+    must inherit from this class and implement all abstract methods.
+
+    This provides a unified interface for:
+    - Text generation
+    - Vision/multimodal processing
+    - Structured JSON output
+    - Model availability checking
+    - Capability reporting
+    """
+
+    # Override in subclasses
+    description: str = "Base Provider"
+    requires_env_vars: List[str] = []
+
+    def __init__(self):
+        """Initialize the provider."""
+        self.capabilities = ProviderCapabilities()
+        self.config = self._load_config()
+        logger.info(f"Initialized {self.__class__.__name__}")
+
+    @abstractmethod
+    def _load_config(self) -> Dict[str, Any]:
+        """Load provider-specific configuration."""
+        pass
+
+    @abstractmethod
+    def generate(
+        self,
+        prompt: str,
+        images: Optional[List[str]] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        **kwargs,
+    ) -> str:
+        """
+        Generate text from the model.
+
+        Args:
+            prompt: The text prompt
+            images: Optional list of base64-encoded images for multimodal models
+            temperature: Sampling temperature
+            max_tokens: Maximum tokens to generate
+            **kwargs: Additional provider-specific parameters
+
+        Returns:
+            Generated text response
+        """
+        pass
+
+    @abstractmethod
+    def extract_information(
+        self, text: str, image_path: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Extract structured information from text and/or image.
+
+        This is the main interface method for document processing.
+
+        Args:
+            text: Extracted text content from document
+            image_path: Optional path to image for vision analysis
+
+        Returns:
+            Dictionary with extraction results including:
+            - raw_analysis: The parsed structured data
+            - success: Boolean indicating success/failure
+            - model_name: Name of the model used
+            - provider: Provider identifier
+            - validation_passed: Whether schema validation passed
+            - validation_errors: List of validation errors if any
+        """
+        pass
+
+    @classmethod
+    @abstractmethod
+    def is_available(cls) -> bool:
+        """
+        Check if the provider is available in the current environment.
+
+        Returns:
+            True if the provider can be used, False otherwise
+        """
+        pass
+
+    def get_capabilities(self) -> Dict[str, bool]:
+        """
+        Get provider capabilities as a dictionary.
+
+        Returns:
+            Dictionary of capability flags
+        """
+        return {
+            "vision": self.capabilities.vision,
+            "multilingual": self.capabilities.multilingual,
+            "streaming": self.capabilities.streaming,
+            "structured_output": self.capabilities.structured_output,
+            "local": self.capabilities.local,
+            "gpu_acceleration": self.capabilities.gpu_acceleration,
+            "long_context": self.capabilities.long_context,
+            "reasoning": self.capabilities.reasoning,
+            "ocr": self.capabilities.ocr,
+            "fast": self.capabilities.fast,
+            "document_specialized": self.capabilities.document_specialized,
+        }
+
+    def supports_capability(self, capability: str) -> bool:
+        """
+        Check if provider supports a specific capability.
+
+        Args:
+            capability: Name of capability to check
+
+        Returns:
+            True if capability is supported
+        """
+        return getattr(self.capabilities, capability, False)
+
+
+class HTTPProvider(BaseProvider):
+    """
+    Base class for HTTP API-based providers.
+
+    Provides common functionality for providers that use HTTP APIs:
+    - Connection pooling
+    - Retry logic
+    - Authentication
+    - Rate limiting
+
+    Examples: Anthropic, Google, OpenAI, OpenRouter
+    """
+
+    DEFAULT_CONFIG = {
+        "timeout": 60,
+        "max_retries": 3,
+        "retry_backoff": 1.0,
+    }
+
+    def __init__(self):
+        """Initialize HTTP provider with session management."""
+        super().__init__()
+        self.session = None  # Initialized on first use
+        self.headers = self._setup_headers()
+
+    @abstractmethod
+    def _setup_headers(self) -> Dict[str, str]:
+        """Setup HTTP request headers (authentication, content-type, etc.)."""
+        pass
+
+    def _get_session(self):
+        """Get or create HTTP session with connection pooling."""
+        if self.session is None:
+            import requests
+            from requests.adapters import HTTPAdapter
+            from urllib3.util import Retry
+
+            self.session = requests.Session()
+
+            retry_strategy = Retry(
+                total=self.config.get("max_retries", 3),
+                backoff_factor=self.config.get("retry_backoff", 1.0),
+                status_forcelist=[429, 500, 502, 503, 504],
+            )
+
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+            self.session.mount("http://", adapter)
+            self.session.mount("https://", adapter)
+
+            logger.debug("Created HTTP session with connection pooling")
+
+        return self.session
+
+    def _make_request(
+        self, method: str, url: str, json_data: Optional[Dict] = None, **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Make HTTP request with retry logic.
+
+        Args:
+            method: HTTP method (GET, POST, etc.)
+            url: Request URL
+            json_data: JSON payload for POST requests
+            **kwargs: Additional request parameters
+
+        Returns:
+            Response data as dictionary
+        """
+        session = self._get_session()
+
+        try:
+            response = session.request(
+                method=method,
+                url=url,
+                headers=self.headers,
+                json=json_data,
+                timeout=self.config.get("timeout", 60),
+                **kwargs,
+            )
+            response.raise_for_status()
+            return response.json()
+
+        except Exception as e:
+            logger.error(f"HTTP request failed: {e}")
+            raise
+
+
+class LocalProvider(BaseProvider):
+    """
+    Base class for local/embedded providers.
+
+    Provides common functionality for providers that run models locally:
+    - Model loading/unloading
+    - Memory management
+    - GPU acceleration detection
+
+    Examples: llama.cpp, Ollama (local), vLLM
+    """
+
+    DEFAULT_CONFIG = {
+        "n_ctx": 4096,
+        "n_threads": None,  # Auto-detect
+        "n_gpu_layers": 0,
+        "verbose": False,
+    }
+
+    def __init__(self):
+        """Initialize local provider."""
+        super().__init__()
+        self.model = None  # Loaded on first use
+        self.capabilities.local = True
+
+    @abstractmethod
+    def _load_model(self):
+        """Load the model into memory."""
+        pass
+
+    def _ensure_model_loaded(self):
+        """Ensure model is loaded before use."""
+        if self.model is None:
+            self.model = self._load_model()
+            logger.info(f"Loaded model for {self.__class__.__name__}")
+
+    def unload_model(self):
+        """Unload model to free memory."""
+        if self.model is not None:
+            self.model = None
+            import gc
+
+            gc.collect()
+            logger.info(f"Unloaded model for {self.__class__.__name__}")
+
+    def __del__(self):
+        """Cleanup when provider is destroyed."""
+        self.unload_model()
+
+
+__all__ = [
+    "BaseProvider",
+    "HTTPProvider",
+    "LocalProvider",
+    "ProviderCapabilities",
+]
