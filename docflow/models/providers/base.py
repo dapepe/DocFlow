@@ -108,6 +108,22 @@ class BaseProvider(ABC):
         """
         pass
 
+    @abstractmethod
+    async def extract_information_async(
+        self, text: str, image_path: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Async version of extract_information.
+
+        Args:
+            text: Extracted text content from document
+            image_path: Optional path to image for vision analysis
+
+        Returns:
+            Dictionary with extraction results (same structure as sync version)
+        """
+        pass
+
     @classmethod
     @abstractmethod
     def is_available(cls) -> bool:
@@ -205,6 +221,34 @@ class HTTPProvider(BaseProvider):
             logger.debug("Created HTTP session with connection pooling")
 
         return self.session
+
+    async def _make_request_async(
+        self, method: str, url: str, json_data: Optional[Dict] = None, **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Make async HTTP request with error handling.
+        """
+        client = await self._get_async_client()
+        try:
+            response = await client.request(
+                method=method, url=url, json=json_data, **kwargs
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error(f"Async HTTP request failed: {e}")
+            raise
+
+    async def __aenter__(self):
+        """Async context manager entry."""
+        await self._get_async_client()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit."""
+        if self.async_client:
+            await self.async_client.aclose()
+            self.async_client = None
 
     def _make_request(
         self, method: str, url: str, json_data: Optional[Dict] = None, **kwargs

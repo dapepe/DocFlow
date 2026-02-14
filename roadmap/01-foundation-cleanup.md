@@ -32,6 +32,6 @@ Fixing the "broken windows" in the codebase.
 - [ ] **Exports**: Add `__all__` to modules to define public API.
 
 ## 1.4 Configuration & Testing
-- [ ] **Centralized Config**: Replace scattered `os.getenv` calls with a Pydantic `Settings` object.
+- [x] **Centralized Config**: Replace scattered `os.getenv` calls with a Pydantic `Settings` object.
 - [x] **Fix Tests**: Repair the 8 broken tests in `tests/`.
 - [x] **Test Structure**: Add `tests/conftest.py` for shared fixtures.

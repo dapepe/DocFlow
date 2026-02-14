@@ -12,7 +12,11 @@ from .providers.base import HTTPProvider
 from ..settings import settings
 from ..prompt_manager import prompt_manager
 from ..response_validator import ResponseValidator
-from ..performance_optimizer import cached_model_response, optimize_text_extraction
+from ..performance_optimizer import (
+    cached_model_response,
+    cached_model_response_async,
+    optimize_text_extraction,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -122,10 +126,14 @@ class OpenRouterBaseModel(HTTPProvider):
         return mime_types.get(extension, "image/jpeg")
 
     def generate(
-        self, prompt: str, images: Optional[List[str]] = None, **kwargs
+        self,
+        prompt: str,
+        images: Optional[List[str]] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        **kwargs,
     ) -> str:
         """Implement abstract generate method"""
-        # Not used by extract_information but required by BaseProvider
         return ""
 
     @cached_model_response
@@ -176,6 +184,113 @@ class OpenRouterBaseModel(HTTPProvider):
 
             # Use HTTPProvider's _make_request which handles retries and session pooling
             response_data = self._make_request(
+                method="POST",
+                url=f"{self.config['api_base']}/chat/completions",
+                json_data=payload,
+            )
+
+            if "choices" in response_data and response_data["choices"]:
+                content = response_data["choices"][0]["message"]["content"]
+
+                try:
+                    parsed_response = json.loads(content)
+
+                    # Validate and enhance response
+                    is_valid, errors, corrected_response = (
+                        self.validator.validate_response(parsed_response)
+                    )
+
+                    result = {
+                        "raw_analysis": corrected_response,
+                        "model_name": self.model,
+                        "success": True,
+                        "validation_passed": is_valid,
+                        "validation_errors": errors if errors else None,
+                        "text_optimized": len(text) != len(optimized_text),
+                        "provider": "OpenRouter",
+                    }
+
+                    if not is_valid:
+                        logger.warning(
+                            f"OpenRouter response validation issues: {errors}"
+                        )
+
+                    return result
+
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse OpenRouter response: {e}")
+                    return {
+                        "success": False,
+                        "error": "Invalid JSON response from OpenRouter",
+                        "model_name": self.model,
+                        "provider": "OpenRouter",
+                    }
+            else:
+                logger.error("Empty response from OpenRouter API")
+                return {
+                    "success": False,
+                    "error": "Empty response from OpenRouter",
+                    "model_name": self.model,
+                    "provider": "OpenRouter",
+                }
+
+        except Exception as e:
+            logger.error(f"Error in OpenRouter analysis: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "model_name": self.model,
+                "provider": "OpenRouter",
+            }
+
+    @cached_model_response_async
+    async def extract_information_async(
+        self, text: str, image_path: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Extract information from text and/or image using OpenRouter (Async)"""
+        try:
+            # Optimize text for processing
+            optimized_text = optimize_text_extraction(text)
+            prompt = self._generate_enhanced_prompt(optimized_text)
+
+            # Prepare messages
+            messages = [
+                {
+                    "role": "system",
+                    "content": "You are an expert document analysis AI with advanced OCR and information extraction capabilities.",
+                }
+            ]
+
+            # Prepare content parts
+            content_parts = [{"type": "text", "text": prompt}]
+
+            # Add image if available
+            if image_path:
+                base64_image = self._encode_image(image_path)
+                mime_type = self._get_image_mime_type(image_path)
+                content_parts.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{mime_type};base64,{base64_image}",
+                            "detail": "high",
+                        },
+                    }
+                )
+
+            messages.append({"role": "user", "content": content_parts})
+
+            # Prepare API request
+            payload = {
+                "model": self.model,
+                "messages": messages,
+                "max_tokens": self.config["max_tokens"],
+                "temperature": self.config["temperature"],
+                "response_format": {"type": "json_object"},
+            }
+
+            # Use HTTPProvider's _make_request_async
+            response_data = await self._make_request_async(
                 method="POST",
                 url=f"{self.config['api_base']}/chat/completions",
                 json_data=payload,

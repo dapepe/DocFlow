@@ -11,14 +11,24 @@ import json
 import logging
 from typing import Dict, Any, Optional, List, Union
 from pathlib import Path
-from .. import BaseModel, ModelRegistry
+from .base import LocalProvider
 from ...prompt_manager import prompt_manager
 from ...response_validator import ResponseValidator
 
 logger = logging.getLogger(__name__)
 
 
-class LlamaCppProvider(BaseModel):
+class LlamaCppProvider(LocalProvider):
+    """
+    Base provider for llama.cpp GGUF models.
+    
+    Loads models directly via llama-cpp-python for optimal performance.
+    Supports both text-only and multimodal (vision) models.
+    """
+    Base provider for llama.cpp GGUF models.
+    
+    Loads models directly via llama-cpp-python for optimal performance.
+    Supports both text-only and multimodal (vision) models.
     """
     Base provider for llama.cpp GGUF models.
 
@@ -154,9 +164,6 @@ class LlamaCppProvider(BaseModel):
 
     def _get_instruction_key(self) -> str:
         """Get the model key for prompt instructions."""
-        for model_id, model_class in ModelRegistry._models.items():
-            if model_class is self.__class__:
-                return model_id
         return (
             self.__class__.__name__.lower().replace("model", "").replace("provider", "")
         )

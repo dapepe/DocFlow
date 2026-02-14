@@ -20,6 +20,8 @@ import dateutil.parser
 from PIL import Image
 import pdf2image
 import tempfile
+import aiofiles
+from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +44,9 @@ class DocumentProcessor:
 
         # Initialize AI model based on preference
         self.ai_model = self._initialize_ai_model(ai_model)
+
+        # Executor for CPU-bound tasks
+        self.executor = ThreadPoolExecutor(max_workers=4)
 
     def _process_pdf_for_vision(self, file_path: str) -> str:
         """Convert PDF to image for vision model processing"""
@@ -445,6 +450,65 @@ class DocumentProcessor:
     # Async Methods
     # =========================================================================
 
+    async def _extract_text_from_pdf_async(
+        self, file_path: str, use_ocr: bool = False, convert_to_img: bool = False
+    ) -> tuple[str, Optional[str]]:
+        """Async wrapper for PDF text extraction"""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            self.executor,
+            self._extract_text_from_pdf,
+            file_path,
+            use_ocr,
+            convert_to_img,
+        )
+
+    async def _extract_text_from_docx_async(self, file_path: str) -> tuple[str, None]:
+        """Async wrapper for DOCX text extraction"""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            self.executor, self._extract_text_from_docx, file_path
+        )
+
+    async def _extract_text_from_txt_async(self, file_path: str) -> tuple[str, None]:
+        """Async wrapper for TXT text extraction"""
+        try:
+            async with aiofiles.open(file_path, "r", encoding="utf-8") as file:
+                content = await file.read()
+                return content, None
+        except Exception as e:
+            logger.error(f"Error extracting text from TXT: {e}")
+            raise
+
+    async def _process_image_async(
+        self, file_path: str, use_ocr: bool = False
+    ) -> tuple[str, Optional[str]]:
+        """Async wrapper for image processing"""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            self.executor, self._process_image, file_path, use_ocr
+        )
+
+    async def _extract_text_async(
+        self, file_path: str, use_ocr: bool = False, convert_to_img: bool = False
+    ) -> tuple[str, Optional[str]]:
+        """Async version of _extract_text"""
+        path = Path(file_path)
+        suffix = path.suffix.lower()
+
+        if suffix == ".pdf":
+            return await self._extract_text_from_pdf_async(
+                file_path, use_ocr=use_ocr, convert_to_img=convert_to_img
+            )
+        elif suffix == ".docx":
+            return await self._extract_text_from_docx_async(file_path)
+        elif suffix == ".txt":
+            return await self._extract_text_from_txt_async(file_path)
+        elif suffix in {".jpg", ".jpeg", ".png"}:
+            return await self._process_image_async(file_path, use_ocr=use_ocr)
+        else:
+            raise ValueError(f"Unsupported file format: {suffix}")
+
     async def process_document_async(
         self, file_path: str, use_ocr: bool = False, convert_to_img: bool = False
     ) -> Dict:
@@ -452,8 +516,7 @@ class DocumentProcessor:
         Async version of process_document.
 
         Processes a document with the selected AI model and extract information.
-        This method runs the synchronous process_document in a thread pool to enable
-        concurrent processing without blocking the event loop.
+        This method uses true async I/O where possible and thread pool for CPU-bound tasks.
 
         Args:
             file_path: Path to the document file
@@ -463,14 +526,134 @@ class DocumentProcessor:
         Returns:
             Dictionary containing extraction results
         """
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(
-            None,  # Uses default executor
-            self.process_document,
-            file_path,
-            use_ocr,
-            convert_to_img,
-        )
+        try:
+            path = Path(file_path)
+            if path.suffix.lower() not in self.supported_formats:
+                raise ValueError(f"Unsupported file format: {path.suffix}")
+
+            # Extract text asynchronously
+            text, image_path = await self._extract_text_async(
+                file_path, use_ocr=use_ocr, convert_to_img=convert_to_img
+            )
+
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(
+                    f"Extracted text length: {len(text)}, image path: {image_path}"
+                )
+
+            # Use AI model for enhanced extraction
+            result = {
+                "file_name": path.name,
+                "text_length": len(text),
+                "text_content": text,
+            }
+
+            try:
+                logger.info(
+                    f"Processing with AI model: {self.ai_model.__class__.__name__}"
+                )
+
+                # Check for async support
+                if hasattr(self.ai_model, "extract_information_async"):
+                    ai_analysis = await self.ai_model.extract_information_async(
+                        text=text, image_path=image_path
+                    )
+                else:
+                    # Fallback to sync method in thread pool
+                    loop = asyncio.get_event_loop()
+                    ai_analysis = await loop.run_in_executor(
+                        self.executor,
+                        self.ai_model.extract_information,
+                        text,
+                        image_path,
+                    )
+
+                result["ai_analysis"] = ai_analysis
+
+                if ai_analysis.get("success"):
+                    # Extract fields from schema-based response
+                    raw_analysis = ai_analysis.get("raw_analysis", {})
+
+                    # Add core fields
+                    result["document_type"] = raw_analysis.get("doctype")
+                    if raw_analysis.get("date"):
+                        result["date"] = raw_analysis["date"]
+                    if raw_analysis.get("title"):
+                        result["title"] = raw_analysis["title"]
+                    if raw_analysis.get("reference"):
+                        result["reference"] = raw_analysis["reference"]
+
+                    # Add metadata
+                    meta = raw_analysis.get("meta", {})
+                    if meta:
+                        # Add dates
+                        if "dates" in meta:
+                            result["dates"] = meta["dates"]
+
+                        # Add amounts
+                        if "amounts" in meta:
+                            for key, value in meta["amounts"].items():
+                                if value is not None:  # Only add non-null values
+                                    result[f"{key}_amount"] = value
+
+                        # Add entities
+                        if "entities" in meta:
+                            result["entities"] = meta["entities"]
+
+                else:
+                    logger.warning(
+                        f"AI analysis failed: {ai_analysis.get('error', 'Unknown error')}"
+                    )
+
+            except Exception as e:
+                logger.error(f"AI model analysis failed: {e}", exc_info=True)
+                result["ai_analysis"] = {
+                    "success": False,
+                    "error": str(e),
+                    "model_name": self.ai_model.__class__.__name__,
+                }
+
+            # Perform basic classification if needed
+            if "document_type" not in result or not result["document_type"]:
+                try:
+                    # Classification is CPU bound (regex), run in executor
+                    loop = asyncio.get_event_loop()
+                    classification = await loop.run_in_executor(
+                        self.executor, self._classify_document, text
+                    )
+
+                    if isinstance(classification, tuple):
+                        doc_type, confidence = classification
+                    else:
+                        doc_type = classification
+                        confidence = 1.0
+                    result["document_type"] = doc_type
+                    result["classification_confidence"] = confidence
+                except Exception as e:
+                    logger.error(f"Classification failed: {e}")
+                    result["document_type"] = "unknown"
+                    result["classification_confidence"] = 0.0
+
+            logger.info(f"Successfully processed document: {path.name}")
+            return result
+
+        except Exception as e:
+            logger.error(f"Error processing document: {e}", exc_info=True)
+            return {
+                "error": str(e),
+                "file_name": path.name if "path" in locals() else None,
+                "document_type": "unknown",  # Add default document type for error cases
+            }
+        finally:
+            # Cleanup temp files
+            for temp_path in self._temp_files:
+                try:
+                    temp_path.unlink(missing_ok=True)
+                except Exception as cleanup_error:
+                    logger.warning(
+                        f"Failed to remove temp file {temp_path}: {cleanup_error}"
+                    )
+            self._temp_files.clear()
 
     async def process_batch_async(
         self,

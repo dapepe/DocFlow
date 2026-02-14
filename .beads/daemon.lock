@@ -1,7 +1,7 @@
 {
-  "pid": 28885,
-  "parent_pid": 28866,
+  "pid": 37166,
+  "parent_pid": 37140,
   "database": "/mnt/d/dev/DocFlow/.beads/beads.db",
   "version": "0.49.1",
-  "started_at": "2026-02-14T13:25:42.64097624Z"
+  "started_at": "2026-02-14T14:19:49.452111813Z"
 }

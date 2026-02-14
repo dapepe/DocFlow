@@ -206,3 +206,60 @@ class OllamaBaseModel(HTTPProvider):
                 "model_name": self.model,
                 "provider": "Ollama",
             }
+
+    @cached_model_response_async
+    async def extract_information_async(
+        self, text: str, image_path: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Extract information from text and/or image using Ollama (Async)"""
+        try:
+            # Optimize text for processing
+            optimized_text = optimize_text_extraction(text)
+            prompt = self._generate_enhanced_prompt(optimized_text)
+
+            payload = {
+                "model": self.model,
+                "prompt": prompt,
+                "format": "json",
+                "stream": False,
+                "options": {"temperature": self.config["temperature"]},
+            }
+
+            # Use HTTPProvider's _make_request_async
+            response_data = await self._make_request_async(
+                method="POST",
+                url=f"{self.config['host']}/api/generate",
+                json_data=payload,
+            )
+
+            response_text = response_data.get("response", "")
+            parsed_response = self._repair_json(response_text)
+
+            # Validate response
+            is_valid, errors, corrected_response = self.validator.validate_response(
+                parsed_response
+            )
+
+            result = {
+                "raw_analysis": corrected_response,
+                "model_name": self.model,
+                "success": True,
+                "validation_passed": is_valid,
+                "validation_errors": errors if errors else None,
+                "text_optimized": len(text) != len(optimized_text),
+                "provider": "Ollama",
+            }
+
+            if not is_valid:
+                logger.warning(f"Ollama response validation issues: {errors}")
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error in Ollama analysis: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "model_name": self.model,
+                "provider": "Ollama",
+            }
