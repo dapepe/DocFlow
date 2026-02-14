@@ -8,9 +8,9 @@ by implementing the BaseProvider interface.
 
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List
-import logging
+import structlog
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class ProviderCapabilities:
@@ -53,7 +53,7 @@ class BaseProvider(ABC):
         """Initialize the provider."""
         self.capabilities = ProviderCapabilities()
         self.config = self._load_config()
-        logger.info(f"Initialized {self.__class__.__name__}")
+        logger.info("provider_initialized", provider_class=self.__class__.__name__)
 
     @abstractmethod
     def _load_config(self) -> Dict[str, Any]:
@@ -218,7 +218,11 @@ class HTTPProvider(BaseProvider):
             self.session.mount("http://", adapter)
             self.session.mount("https://", adapter)
 
-            logger.debug("Created HTTP session with connection pooling")
+            logger.debug(
+                "http_session_created",
+                max_retries=self.config.get("max_retries", 3),
+                retry_backoff=self.config.get("retry_backoff", 1.0),
+            )
 
         return self.session
 
@@ -236,7 +240,9 @@ class HTTPProvider(BaseProvider):
             response.raise_for_status()
             return response.json()
         except Exception as e:
-            logger.error(f"Async HTTP request failed: {e}")
+            logger.error(
+                "async_http_request_failed", error=str(e), error_type=type(e).__name__
+            )
             raise
 
     async def __aenter__(self):
@@ -280,7 +286,13 @@ class HTTPProvider(BaseProvider):
             return response.json()
 
         except Exception as e:
-            logger.error(f"HTTP request failed: {e}")
+            logger.error(
+                "http_request_failed",
+                method=method,
+                url=url,
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             raise
 
 
@@ -318,7 +330,7 @@ class LocalProvider(BaseProvider):
         """Ensure model is loaded before use."""
         if self.model is None:
             self.model = self._load_model()
-            logger.info(f"Loaded model for {self.__class__.__name__}")
+            logger.info("model_loaded", provider_class=self.__class__.__name__)
 
     def unload_model(self):
         """Unload model to free memory."""
@@ -327,7 +339,7 @@ class LocalProvider(BaseProvider):
             import gc
 
             gc.collect()
-            logger.info(f"Unloaded model for {self.__class__.__name__}")
+            logger.info("model_unloaded", provider_class=self.__class__.__name__)
 
     def __del__(self):
         """Cleanup when provider is destroyed."""
