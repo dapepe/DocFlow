@@ -21,16 +21,6 @@ logger = logging.getLogger(__name__)
 class LlamaCppProvider(LocalProvider):
     """
     Base provider for llama.cpp GGUF models.
-    
-    Loads models directly via llama-cpp-python for optimal performance.
-    Supports both text-only and multimodal (vision) models.
-    """
-    Base provider for llama.cpp GGUF models.
-    
-    Loads models directly via llama-cpp-python for optimal performance.
-    Supports both text-only and multimodal (vision) models.
-    """
-    Base provider for llama.cpp GGUF models.
 
     Loads models directly via llama-cpp-python for optimal performance.
     Supports both text-only and multimodal (vision) models.
@@ -179,6 +169,7 @@ class LlamaCppProvider(LocalProvider):
         images: Optional[List[str]] = None,
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
+        **kwargs,
     ) -> str:
         """
         Generate text from the model.
@@ -331,6 +322,26 @@ class LlamaCppProvider(LocalProvider):
                 else "unknown",
                 "provider": "llama.cpp",
             }
+
+    async def extract_information_async(
+        self, text: str, image_path: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Async wrapper for extract_information using run_in_executor.
+
+        Args:
+            text: Extracted text content from document
+            image_path: Optional path to image for vision analysis
+
+        Returns:
+            Dictionary with extraction results (same structure as sync version)
+        """
+        import asyncio
+
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None, self.extract_information, text, image_path
+        )
 
     @classmethod
     def is_available(cls) -> bool:

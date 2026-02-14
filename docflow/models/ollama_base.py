@@ -13,7 +13,11 @@ from .providers.base import HTTPProvider
 from ..settings import settings
 from ..prompt_manager import prompt_manager
 from ..response_validator import ResponseValidator
-from ..performance_optimizer import cached_model_response, optimize_text_extraction
+from ..performance_optimizer import (
+    cached_model_response,
+    cached_model_response_async,
+    optimize_text_extraction,
+)
 
 logger = logging.getLogger(__name__)
 
