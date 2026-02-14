@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any, Union
 from .models import BaseModel as BaseAIModel  # Alias for backward compatibility
 from .models import ModelRegistry
-import logging
+import structlog
 import re
 from typing import BinaryIO
 import docx
@@ -23,7 +23,7 @@ import tempfile
 import aiofiles
 from concurrent.futures import ThreadPoolExecutor
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class DocumentProcessor:
@@ -40,7 +40,9 @@ class DocumentProcessor:
 
         # Get available models
         self.available_models = ModelRegistry.list_models()
-        logger.info(f"Available AI models: {list(self.available_models.keys())}")
+        logger.info(
+            "available_models_loaded", models=list(self.available_models.keys())
+        )
 
         # Initialize AI model based on preference
         self.ai_model = self._initialize_ai_model(ai_model)
@@ -63,7 +65,7 @@ class DocumentProcessor:
                 self._temp_files.append(temp_path)
                 return temp_path.as_posix()
         except Exception as e:
-            logger.error(f"Error converting PDF to image: {e}")
+            logger.error("pdf_to_image_conversion_failed", error=str(e), exc_info=True)
             raise
 
     def _extract_text_with_ocr(self, file_path: str) -> str:
@@ -71,14 +73,14 @@ class DocumentProcessor:
         try:
             import docling
         except Exception as e:
-            logger.warning(f"OCR requested but docling is unavailable: {e}")
+            logger.warning("ocr_docling_unavailable", error=str(e))
             return ""
 
         try:
             document = docling.Document(str(file_path))
             return document.extract_text(ocr=True)
         except Exception as e:
-            logger.warning(f"OCR extraction failed for {file_path}: {e}")
+            logger.warning("ocr_extraction_failed", file_path=file_path, error=str(e))
             return ""
 
     def _process_image(
@@ -92,7 +94,7 @@ class DocumentProcessor:
             extracted_text = self._extract_text_with_ocr(file_path) if use_ocr else ""
             return extracted_text, image_path
         except Exception as e:
-            logger.error(f"Error processing image: {e}")
+            logger.error("image_processing_failed", error=str(e), exc_info=True)
             raise
 
     def _extract_text_from_pdf(
@@ -121,7 +123,7 @@ class DocumentProcessor:
 
             return text, image_path
         except Exception as e:
-            logger.error(f"Error extracting text from PDF: {e}")
+            logger.error("pdf_text_extraction_failed", error=str(e), exc_info=True)
             raise
 
     def _extract_text_from_docx(self, file_path: str) -> tuple[str, None]:
@@ -130,7 +132,7 @@ class DocumentProcessor:
             doc = docx.Document(file_path)
             return "\n".join([paragraph.text for paragraph in doc.paragraphs]), None
         except Exception as e:
-            logger.error(f"Error extracting text from DOCX: {e}")
+            logger.error("docx_text_extraction_failed", error=str(e), exc_info=True)
             raise
 
     def _extract_text_from_txt(self, file_path: str) -> tuple[str, None]:
@@ -139,7 +141,7 @@ class DocumentProcessor:
             with open(file_path, "r", encoding="utf-8") as file:
                 return file.read(), None
         except Exception as e:
-            logger.error(f"Error extracting text from TXT: {e}")
+            logger.error("txt_text_extraction_failed", error=str(e), exc_info=True)
             raise
 
     def _extract_text(
@@ -167,8 +169,7 @@ class DocumentProcessor:
         max_score = 0
         best_type = "unknown"
 
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug("Starting document classification")
+        logger.debug("document_classification_started")
 
         for doc_type, type_config in self.rules.get("rules", {}).items():
             keywords = type_config.get("keywords", [])
@@ -191,17 +192,20 @@ class DocumentProcessor:
                     if re.search(pattern, text, re.IGNORECASE | re.MULTILINE):
                         score += 0.5
 
-            if logger.isEnabledFor(logging.DEBUG):
-                logger.debug(
-                    f"Document type '{doc_type}' scored {score} with keywords: {matched_keywords}"
-                )
+            logger.debug(
+                "document_type_scored",
+                doc_type=doc_type,
+                score=score,
+                matched_keywords=matched_keywords,
+            )
 
             if score > max_score:
                 max_score = score
                 best_type = doc_type
 
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f"Final classification: {best_type} with score {max_score}")
+        logger.debug(
+            "document_classification_complete", best_type=best_type, max_score=max_score
+        )
         return best_type
 
     def process_document(
@@ -217,10 +221,9 @@ class DocumentProcessor:
             text, image_path = self._extract_text(
                 file_path, use_ocr=use_ocr, convert_to_img=convert_to_img
             )
-            if logger.isEnabledFor(logging.DEBUG):
-                logger.debug(
-                    f"Extracted text length: {len(text)}, image path: {image_path}"
-                )
+            logger.debug(
+                "text_extraction_complete", text_length=len(text), image_path=image_path
+            )
 
             # Use AI model for enhanced extraction
             result = {
@@ -231,7 +234,8 @@ class DocumentProcessor:
 
             try:
                 logger.info(
-                    f"Processing with AI model: {self.ai_model.__class__.__name__}"
+                    "ai_model_processing_started",
+                    model_name=self.ai_model.__class__.__name__,
                 )
                 ai_analysis = self.ai_model.extract_information(
                     text=text, image_path=image_path
@@ -270,11 +274,12 @@ class DocumentProcessor:
 
                 else:
                     logger.warning(
-                        f"AI analysis failed: {ai_analysis.get('error', 'Unknown error')}"
+                        "ai_analysis_failed",
+                        error=ai_analysis.get("error", "Unknown error"),
                     )
 
             except Exception as e:
-                logger.error(f"AI model analysis failed: {e}", exc_info=True)
+                logger.error("ai_model_analysis_failed", error=str(e), exc_info=True)
                 result["ai_analysis"] = {
                     "success": False,
                     "error": str(e),
@@ -293,15 +298,15 @@ class DocumentProcessor:
                     result["document_type"] = doc_type
                     result["classification_confidence"] = confidence
                 except Exception as e:
-                    logger.error(f"Classification failed: {e}")
+                    logger.error("document_classification_failed", error=str(e))
                     result["document_type"] = "unknown"
                     result["classification_confidence"] = 0.0
 
-            logger.info(f"Successfully processed document: {path.name}")
+            logger.info("document_processing_complete", file_name=path.name)
             return result
 
         except Exception as e:
-            logger.error(f"Error processing document: {e}", exc_info=True)
+            logger.error("document_processing_failed", error=str(e), exc_info=True)
             return {
                 "error": str(e),
                 "file_name": path.name if "path" in locals() else None,
@@ -313,14 +318,15 @@ class DocumentProcessor:
                     temp_path.unlink(missing_ok=True)
                 except Exception as cleanup_error:
                     logger.warning(
-                        f"Failed to remove temp file {temp_path}: {cleanup_error}"
+                        "temp_file_cleanup_failed",
+                        temp_path=str(temp_path),
+                        error=str(cleanup_error),
                     )
             self._temp_files.clear()
 
     def _initialize_ai_model(self, model_name: Optional[str]) -> BaseAIModel:
         """Initialize the specified AI model with proper error handling"""
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f"Initializing AI model: {model_name}")
+        logger.debug("ai_model_initialization_started", model_name=model_name)
 
         try:
             # Get model class from registry
@@ -331,7 +337,7 @@ class DocumentProcessor:
             )
 
             if not model_class:
-                logger.warning(f"Model {model_name} not found, using fallback")
+                logger.warning("model_not_found_using_fallback", model_name=model_name)
                 model_class = ModelRegistry.get_model("fallback")
 
             if not model_class.is_available():
@@ -340,7 +346,12 @@ class DocumentProcessor:
             return model_class()
 
         except Exception as e:
-            logger.error(f"Error initializing model '{model_name}': {e}", exc_info=True)
+            logger.error(
+                "ai_model_initialization_failed",
+                model_name=model_name,
+                error=str(e),
+                exc_info=True,
+            )
             # Always fall back to the fallback model
             return ModelRegistry.get_model("fallback")()
 
@@ -353,7 +364,9 @@ class DocumentProcessor:
             with open(rules_file, "r") as f:
                 return yaml.safe_load(f)
         except Exception as e:
-            logger.error(f"Error loading rules file: {e}")
+            logger.error(
+                "rules_file_loading_failed", rules_file=rules_file, error=str(e)
+            )
             return {}
 
     def _extract_metadata(self, text: str, doc_type: str) -> Dict:
@@ -363,9 +376,11 @@ class DocumentProcessor:
             self.rules.get("rules", {}).get(doc_type, {}).get("metadata_fields", {})
         )
 
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f"Attempting to extract metadata for type '{doc_type}'")
-            logger.debug(f"Available fields: {fields}")
+        logger.debug(
+            "metadata_extraction_started",
+            doc_type=doc_type,
+            available_fields=list(fields.keys()),
+        )
 
         for field_name, field_config in fields.items():
             pattern = field_config.get("pattern", "")
@@ -377,8 +392,9 @@ class DocumentProcessor:
                 # Updated pattern to handle GC-2024/12/01 format
                 pattern = r"(?i)(?:Invoice\s+No\.?:|Rechnung\s+Nr\.?:|Rechnungsnummer:?|Invoice\s+number:?)\s*((?:[A-Za-z]{1,4}[-]?\d{4}[-/]\d{1,2}[-/]\d{1,2})|(?:[A-Za-z0-9][-A-Za-z0-9/]*[A-Za-z0-9]))"
 
-            if logger.isEnabledFor(logging.DEBUG):
-                logger.debug(f"Using pattern for {field_name}: {pattern}")
+            logger.debug(
+                "pattern_matching_field", field_name=field_name, pattern=pattern
+            )
 
             matches = re.findall(pattern, text, re.MULTILINE | re.IGNORECASE)
             if matches:
@@ -389,12 +405,15 @@ class DocumentProcessor:
                     field_type = field_config.get("type", "String")
                     converted_value = self._convert_value(value, field_type)
                     metadata[field_name] = converted_value
-                    if logger.isEnabledFor(logging.DEBUG):
-                        logger.debug(
-                            f"Field {field_name}: found and converted to {field_type}"
-                        )
+                    logger.debug(
+                        "field_extracted_and_converted",
+                        field_name=field_name,
+                        field_type=field_type,
+                    )
                 except Exception as e:
-                    logger.error(f"Error converting field {field_name}: {e}")
+                    logger.error(
+                        "field_conversion_failed", field_name=field_name, error=str(e)
+                    )
                     continue
 
         return metadata
@@ -422,7 +441,7 @@ class DocumentProcessor:
                 raise ValueError(f"Invalid year in date: {parsed_date.year}")
             return parsed_date.strftime("%Y-%m-%d")
         except Exception as e:
-            logger.error(f"Error parsing date {date_str}: {e}")
+            logger.error("date_parsing_failed", date_str=date_str, error=str(e))
             raise ValueError(f"Invalid date format: {date_str}")
 
     def _parse_float(self, amount_str: str) -> float:
@@ -443,7 +462,7 @@ class DocumentProcessor:
 
             return float(cleaned)
         except Exception as e:
-            logger.error(f"Error parsing float {amount_str}: {e}")
+            logger.error("float_parsing_failed", amount_str=amount_str, error=str(e))
             return 0.0
 
     # =========================================================================
@@ -477,7 +496,9 @@ class DocumentProcessor:
                 content = await file.read()
                 return content, None
         except Exception as e:
-            logger.error(f"Error extracting text from TXT: {e}")
+            logger.error(
+                "txt_text_extraction_async_failed", error=str(e), exc_info=True
+            )
             raise
 
     async def _process_image_async(
@@ -536,10 +557,11 @@ class DocumentProcessor:
                 file_path, use_ocr=use_ocr, convert_to_img=convert_to_img
             )
 
-            if logger.isEnabledFor(logging.DEBUG):
-                logger.debug(
-                    f"Extracted text length: {len(text)}, image path: {image_path}"
-                )
+            logger.debug(
+                "text_extraction_async_complete",
+                text_length=len(text),
+                image_path=image_path,
+            )
 
             # Use AI model for enhanced extraction
             result = {
@@ -550,7 +572,8 @@ class DocumentProcessor:
 
             try:
                 logger.info(
-                    f"Processing with AI model: {self.ai_model.__class__.__name__}"
+                    "ai_model_processing_started_async",
+                    model_name=self.ai_model.__class__.__name__,
                 )
 
                 # Check for async support
@@ -602,11 +625,14 @@ class DocumentProcessor:
 
                 else:
                     logger.warning(
-                        f"AI analysis failed: {ai_analysis.get('error', 'Unknown error')}"
+                        "ai_analysis_failed_async",
+                        error=ai_analysis.get("error", "Unknown error"),
                     )
 
             except Exception as e:
-                logger.error(f"AI model analysis failed: {e}", exc_info=True)
+                logger.error(
+                    "ai_model_analysis_failed_async", error=str(e), exc_info=True
+                )
                 result["ai_analysis"] = {
                     "success": False,
                     "error": str(e),
@@ -630,15 +656,17 @@ class DocumentProcessor:
                     result["document_type"] = doc_type
                     result["classification_confidence"] = confidence
                 except Exception as e:
-                    logger.error(f"Classification failed: {e}")
+                    logger.error("document_classification_failed_async", error=str(e))
                     result["document_type"] = "unknown"
                     result["classification_confidence"] = 0.0
 
-            logger.info(f"Successfully processed document: {path.name}")
+            logger.info("document_processing_complete_async", file_name=path.name)
             return result
 
         except Exception as e:
-            logger.error(f"Error processing document: {e}", exc_info=True)
+            logger.error(
+                "document_processing_failed_async", error=str(e), exc_info=True
+            )
             return {
                 "error": str(e),
                 "file_name": path.name if "path" in locals() else None,
@@ -651,7 +679,9 @@ class DocumentProcessor:
                     temp_path.unlink(missing_ok=True)
                 except Exception as cleanup_error:
                     logger.warning(
-                        f"Failed to remove temp file {temp_path}: {cleanup_error}"
+                        "temp_file_cleanup_failed_async",
+                        temp_path=str(temp_path),
+                        error=str(cleanup_error),
                     )
             self._temp_files.clear()
 
@@ -683,7 +713,11 @@ class DocumentProcessor:
                         file_path, use_ocr=use_ocr, convert_to_img=convert_to_img
                     )
                 except Exception as e:
-                    logger.error(f"Failed to process {file_path}: {e}")
+                    logger.error(
+                        "batch_document_processing_failed",
+                        file_path=file_path,
+                        error=str(e),
+                    )
                     return {
                         "error": str(e),
                         "file_name": Path(file_path).name,
@@ -699,7 +733,7 @@ class DocumentProcessor:
         processed_results = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
-                logger.error(f"Task {i} failed with exception: {result}")
+                logger.error("batch_task_failed", task_index=i, error=str(result))
                 processed_results.append(
                     {
                         "error": str(result),
