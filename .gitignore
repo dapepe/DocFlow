@@ -55,3 +55,6 @@ uv.lock
 # Test files
 test*
 .aider*
+
+# bv (beads viewer) local config and caches
+.bv/

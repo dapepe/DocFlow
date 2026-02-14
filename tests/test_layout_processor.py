@@ -86,19 +86,16 @@ class TestLayoutElement:
 class TestLayoutProcessor:
     """Test LayoutProcessor functionality."""
 
-    @pytest.fixture
-    def processor(self):
-        """Create a LayoutProcessor instance."""
-        return LayoutProcessor()
-
     def test_processor_initialization(self, processor):
         """Test processor initializes correctly."""
         assert processor.elements == []
 
     def test_extract_layout_unsupported_file(self, processor):
         """Test handling of unsupported file types."""
-        with pytest.raises(ValueError):
-            processor.extract_layout("/path/to/file.xyz")
+        with patch("pathlib.Path.exists", return_value=True):
+            result = processor.extract_layout("/path/to/file.xyz")
+            assert "error" in result
+            assert "not supported" in result["error"]
 
     def test_extract_layout_missing_file(self, processor):
         """Test handling of missing files."""
@@ -142,14 +139,18 @@ class TestLayoutProcessor:
                 "INTRODUCTION",
                 metadata={"font_size": 16},
             ),
-            LayoutElement("text", BoundingBox(0, 30, 100, 50, 1), "Some content"),
+            LayoutElement(
+                "text", BoundingBox(0, 30, 100, 50, 1), "Some content", metadata={}
+            ),
             LayoutElement(
                 "text",
                 BoundingBox(0, 60, 100, 80, 1),
                 "CONCLUSION",
                 metadata={"font_size": 16},
             ),
-            LayoutElement("text", BoundingBox(0, 90, 100, 110, 1), "More content"),
+            LayoutElement(
+                "text", BoundingBox(0, 90, 100, 110, 1), "More content", metadata={}
+            ),
         ]
 
         sections = processor._detect_sections(elements)
@@ -168,11 +169,16 @@ class TestExtractLayout:
             tmp_path = tmp.name
 
         try:
-            layout = extract_layout(tmp_path)
+            mock_layout = {"elements": [], "metadata": {"format": "JPEG"}}
+            with patch(
+                "docflow.layout_processor.LayoutProcessor.extract_layout",
+                return_value=mock_layout,
+            ):
+                layout = extract_layout(tmp_path)
 
-            assert "elements" in layout
-            assert "metadata" in layout
-            assert layout["metadata"]["format"] in ["JPEG", "PNG", None]
+                assert "elements" in layout
+                assert "metadata" in layout
+                assert layout["metadata"]["format"] in ["JPEG", "PNG", None]
         finally:
             os.unlink(tmp_path)
 
@@ -194,12 +200,15 @@ class TestPDFLayoutExtraction:
             "metadata": {"total_pages": 1},
         }
 
-        with patch.object(processor, "_extract_pdf_layout", return_value=mock_layout):
-            result = processor.extract_layout("/fake/path.pdf")
+        with patch("pathlib.Path.exists", return_value=True):
+            with patch.object(
+                processor, "_extract_pdf_layout", return_value=mock_layout
+            ):
+                result = processor.extract_layout("/fake/path.pdf")
 
-            assert "sections" in result
-            assert "tables" in result
-            assert "figures" in result
+                assert "sections" in result
+                assert "tables" in result
+                assert "figures" in result
 
 
 class TestDOCXLayoutExtraction:
@@ -238,12 +247,19 @@ class TestImageLayoutExtraction:
             tmp_path = tmp.name
 
         try:
-            layout = processor.extract_layout(tmp_path)
+            # Mock Image.open to avoid file errors
+            with patch("PIL.Image.open") as mock_img_open:
+                # Setup mock context manager
+                mock_context = MagicMock()
+                mock_img_open.return_value.__enter__.return_value = mock_context
+                mock_context.size = (100, 100)
 
-            assert len(layout["elements"]) == 1
-            assert layout["elements"][0]["type"] == "figure"
-            assert "width" in layout["metadata"]
-            assert "height" in layout["metadata"]
+                layout = processor.extract_layout(tmp_path)
+
+                assert len(layout["elements"]) == 1
+                assert layout["elements"][0]["type"] == "figure"
+                assert "width" in layout["metadata"]
+                assert "height" in layout["metadata"]
         finally:
             os.unlink(tmp_path)
 

@@ -429,7 +429,7 @@ class LayoutProcessor:
                 y1=page.height - 100,
                 page=page.page_number,
             )
-        except:
+        except Exception:
             return None
 
     def _detect_sections(self, elements: List[LayoutElement]) -> List[Dict[str, Any]]:

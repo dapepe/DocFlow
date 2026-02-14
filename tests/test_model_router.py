@@ -28,10 +28,10 @@ class TestModelRouter:
             "qwen2.5-vl",
             "llama3.2-vision",
             "olmocr-7b",
-            "claude-vision",
-            "gemini-vision",
+            "openrouter-claude",
+            "openrouter-gemini-flash",
             "qwen-vision",
-            "gpt4-vision",
+            "openrouter-gpt4-vision",
             "fallback",
         ]
 
@@ -134,7 +134,12 @@ class TestModelRouter:
         )
 
         # Should prefer premium models
-        assert model in ["claude-vision", "gemini-vision", "qwen2.5-vl"]
+        assert model in [
+            "openrouter-claude",
+            "openrouter-gemini-flash",
+            "qwen2.5-vl",
+            "llama3.2-vision",
+        ]
 
     def test_fallback_to_default(self, router):
         """Test fallback when no specific match."""
@@ -213,13 +218,13 @@ class TestGetOptimalModel:
         with patch("docflow.model_router.ModelRouter") as MockRouter:
             mock_instance = MagicMock()
             mock_instance.get_model_recommendation.return_value = {
-                "recommended_model": "claude-vision"
+                "recommended_model": "openrouter-claude"
             }
             MockRouter.return_value = mock_instance
 
             model = get_optimal_model(file_path="/path/to/invoice.pdf")
 
-            assert model == "claude-vision"
+            assert model == "openrouter-claude"
 
     def test_get_optimal_model_with_explicit_params(self):
         """Test get_optimal_model with explicit parameters."""

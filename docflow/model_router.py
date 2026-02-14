@@ -8,7 +8,7 @@ Routes to specialized models for specific document types, languages, and require
 import logging
 from typing import Dict, Any, Optional, List
 from pathlib import Path
-from ..models import ModelRegistry
+from .models import ModelRegistry
 
 logger = logging.getLogger(__name__)
 
