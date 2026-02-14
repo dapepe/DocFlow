@@ -11,6 +11,7 @@ from typing import Dict, Any, Optional, List
 import structlog
 
 from docflow.circuit_breaker import CircuitBreaker, CircuitBreakerOpenError
+from docflow.rate_limiter import TokenBucketRateLimiter
 
 logger = structlog.get_logger(__name__)
 
@@ -188,6 +189,8 @@ class HTTPProvider(BaseProvider):
         "timeout": 60,
         "max_retries": 3,
         "retry_backoff": 1.0,
+        "rate_limit_capacity": 100,
+        "rate_limit_refill_rate": 10.0,
     }
 
     def __init__(self):
@@ -197,6 +200,10 @@ class HTTPProvider(BaseProvider):
         self.async_client = None  # Initialized on first async use
         self.headers = self._setup_headers()
         self.circuit_breaker = CircuitBreaker()
+        self.rate_limiter = TokenBucketRateLimiter(
+            capacity=self.config.get("rate_limit_capacity", 100),
+            refill_rate=self.config.get("rate_limit_refill_rate", 10.0),
+        )
 
     @abstractmethod
     def _setup_headers(self) -> Dict[str, str]:
@@ -232,7 +239,7 @@ class HTTPProvider(BaseProvider):
 
     async def _get_async_client(self):
         """Get or create async HTTP client with connection pooling."""
-        if self.async_client is None or self.async_client.is_closed():
+        if self.async_client is None or self.async_client.is_closed:
             import httpx
 
             timeout = httpx.Timeout(self.config.get("timeout", 60))
@@ -259,6 +266,9 @@ class HTTPProvider(BaseProvider):
         """
         # Check if circuit breaker allows execution
         self.circuit_breaker.can_execute()
+
+        # Acquire rate limit token
+        await self.rate_limiter.acquire_async(wait=True)
 
         client = await self._get_async_client()
         try:
@@ -303,6 +313,9 @@ class HTTPProvider(BaseProvider):
         """
         # Check if circuit breaker allows execution
         self.circuit_breaker.can_execute()
+
+        # Acquire rate limit token
+        self.rate_limiter.acquire(wait=True)
 
         session = self._get_session()
 

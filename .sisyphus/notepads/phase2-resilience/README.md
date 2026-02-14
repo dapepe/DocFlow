@@ -1,219 +1,238 @@
-# Phase 2: Resilience (Circuit Breaker) - Complete Analysis
+# Phase 2: Resilience (Rate Limiting) - Analysis Complete
 
-**Status**: ✅ Analysis Complete - Ready for Implementation  
 **Date**: 2026-02-14  
-**Complexity**: Medium  
-**Estimated Duration**: 7-8 hours
+**Status**: ✅ Analysis Complete - Ready for Implementation  
+**Analyst**: Sisyphus-Junior
 
 ---
 
-## 📋 Document Index
+## DOCUMENTS IN THIS FOLDER
 
-This folder contains complete analysis and implementation guidance for Phase 2: Resilience (Circuit Breaker).
+### 1. **rate-limiting-plan.md** (MAIN DOCUMENT)
+Comprehensive implementation plan with:
+- Executive summary
+- Current architecture analysis
+- Token bucket algorithm explanation
+- Thread-safety & async-safety design
+- Configuration strategy
+- Integration points
+- Testing strategy
+- Design decisions with rationale
+- Pseudo-code examples
+- Risk mitigation
 
-### Documents
+**Read this first** for complete understanding.
 
-1. **summary.md** ⭐ START HERE
-   - Quick overview of what we're building
-   - Key findings and design decisions
-   - Timeline and success criteria
-   - 5-minute read
+### 2. **analysis-summary.md** (QUICK REFERENCE)
+Executive summary with:
+- Key findings (5 main points)
+- Implementation scope
+- Token bucket algorithm overview
+- Dual-lock design explanation
+- Error handling strategy
+- Integration with circuit breaker
+- Configuration examples
+- Testing strategy
+- Risks & mitigations
 
-2. **circuit-breaker-analysis.md** 📊 DETAILED ANALYSIS
-   - Current state analysis
-   - Architecture review
-   - Design decisions
-   - Risk assessment
-   - 15-minute read
+**Read this** for quick overview.
 
-3. **implementation-plan.md** 🚀 STEP-BY-STEP GUIDE
-   - Task breakdown (7 tasks)
-   - Detailed implementation steps
-   - Testing strategy
-   - Execution checklist
-   - 20-minute read
+### 3. **implementation-checklist.md** (EXECUTION GUIDE)
+Step-by-step checklist for implementation:
+- Task 1: Create docflow/rate_limiter.py
+- Task 2: Integrate into HTTPProvider
+- Task 3: Write unit tests
+- Task 4: Write integration tests
+- Task 5: Run full test suite
+- Task 6: Update documentation
+- Task 7: Create beads
+- Final verification checklist
+- Success criteria
+- Time estimates
 
-4. **code-snippets.md** 💻 COPY-PASTE READY
-   - Complete code templates
-   - Unit test examples
-   - Integration test examples
-   - Configuration examples
-   - Reference guide
-
----
-
-## 🎯 Quick Start
-
-### For Managers/Reviewers
-1. Read **summary.md** (5 min)
-2. Review **circuit-breaker-analysis.md** sections 1-3 (10 min)
-3. Check success criteria in **summary.md** (2 min)
-
-### For Implementers
-1. Read **summary.md** (5 min)
-2. Study **implementation-plan.md** (20 min)
-3. Use **code-snippets.md** as reference while coding
-4. Follow execution checklist in **implementation-plan.md**
-
-### For Reviewers
-1. Read **summary.md** (5 min)
-2. Review **circuit-breaker-analysis.md** (15 min)
-3. Check test coverage in **implementation-plan.md** (10 min)
-4. Verify against success criteria (5 min)
+**Use this** to execute the implementation.
 
 ---
 
-## 🔑 Key Findings
+## KEY FINDINGS
 
-### Current State
-- ✅ HTTPProvider has basic retry logic
-- ❌ No circuit breaker pattern
-- ❌ Async client implementation is broken
-- ❌ No fallback/degradation strategy
+### ✅ No External Dependencies Needed
+- `requirements.txt` has NO rate limiting library
+- Only stdlib needed: `threading`, `asyncio`, `time`
+- Aligns with Circuit Breaker approach (custom implementation)
 
-### What We're Building
-A **Circuit Breaker pattern** for HTTPProvider with:
-- State machine (CLOSED → OPEN → HALF_OPEN → CLOSED)
-- Configurable failure thresholds
-- Automatic recovery testing
-- Comprehensive logging
+### ✅ HTTPProvider is the Injection Point
+- File: `docflow/models/providers/base.py` (lines 174-332)
+- Two methods to intercept:
+  - `_make_request()` - Sync HTTP requests
+  - `_make_request_async()` - Async HTTP requests
 
-### Why It Matters
-- Prevents cascading failures
-- Enables graceful degradation
-- Improves system resilience
-- Better observability
+### ✅ Async-First Architecture
+- Both sync and async paths exist
+- Requires **dual-lock approach**:
+  - `threading.Lock` for sync path
+  - `asyncio.Lock` for async path
+- Shared token bucket state between both
 
----
+### ✅ Circuit Breaker Pattern Established
+- File: `docflow/circuit_breaker.py` (182 lines)
+- Pattern: Time-based state machine, thread-safe
+- Rate limiter should follow same pattern
 
-## 📊 Implementation Overview
-
-### 7 Tasks (7.25 hours total)
-
-| # | Task | Hours | Status |
-|---|------|-------|--------|
-| 1 | Create CircuitBreaker class | 1.5 | Pending |
-| 2 | Fix async client | 0.5 | Pending |
-| 3 | Integrate CB into HTTPProvider | 1.5 | Pending |
-| 4 | Create exception classes | 0.25 | Pending |
-| 5 | Write unit tests | 1.5 | Pending |
-| 6 | Write integration tests | 1.5 | Pending |
-| 7 | Update documentation | 0.5 | Pending |
+### ✅ Configuration Strategy
+- Use `HTTPProvider.DEFAULT_CONFIG` (existing pattern)
+- Add two new keys:
+  - `rate_limit_capacity`: Max tokens (default: 100)
+  - `rate_limit_refill_rate`: Tokens/sec (default: 10.0)
+- Per-provider override via subclass
 
 ---
 
-## ✅ Success Criteria
+## IMPLEMENTATION SCOPE
 
-All of the following must be true:
+### Files to Create
+1. **`docflow/rate_limiter.py`** (NEW)
+   - TokenBucket class (~150 lines)
+   - RateLimitError exception
 
-1. ✅ CircuitBreaker class with full state machine
-2. ✅ HTTPProvider integrates CB for sync and async
-3. ✅ Async client properly implemented and tested
-4. ✅ All unit tests pass (>85% coverage)
-5. ✅ All integration tests pass
-6. ✅ Logging shows state transitions clearly
-7. ✅ Configuration is flexible and documented
-8. ✅ No new external dependencies added
-9. ✅ No LSP errors in modified files
-10. ✅ Code follows project conventions
+### Files to Modify
+1. **`docflow/models/providers/base.py`**
+   - Add rate limiter to HTTPProvider.__init__
+   - Call in _make_request() and _make_request_async()
+   - Add config keys to DEFAULT_CONFIG
+   - (~30 lines of changes)
 
----
+### Files to Create (Tests)
+1. **`tests/test_rate_limiter.py`** (NEW)
+   - Unit tests for TokenBucket (~200 lines)
 
-## 🚀 Next Steps
+2. **`tests/test_http_provider_rate_limit.py`** (NEW)
+   - Integration tests (~150 lines)
 
-1. **Read summary.md** - Understand the big picture
-2. **Review implementation-plan.md** - See detailed steps
-3. **Use code-snippets.md** - Copy-paste ready code
-4. **Follow execution checklist** - Track progress
-5. **Run tests** - Verify everything works
-6. **Commit changes** - Create atomic commits
-
----
-
-## 📁 Files to Create/Modify
-
-### New Files
-- `docflow/models/providers/circuit_breaker.py` - CircuitBreaker class
-- `tests/test_circuit_breaker.py` - Unit tests
-- `tests/test_http_provider_circuit_breaker.py` - Integration tests
-
-### Modified Files
-- `docflow/models/providers/base.py` - HTTPProvider integration
-- `README.md` - Documentation
+### Files to Update (Documentation)
+1. **`docflow/models/providers/AGENTS.md`**
+   - Add rate limiting section
 
 ---
 
-## 🔍 Key Code Changes
+## TOKEN BUCKET ALGORITHM
 
-### HTTPProvider.__init__
-```python
-self.async_client = None  # NEW
-self.circuit_breaker = self._create_circuit_breaker()  # NEW
+### Core Logic
+```
+tokens_available = min(capacity, tokens + (time_elapsed * refill_rate))
+if tokens_available >= cost:
+    tokens_available -= cost
+    return True (allow request)
+else:
+    return False (rate limited)
 ```
 
-### _make_request() & _make_request_async()
-```python
-# Check circuit breaker
-if self.circuit_breaker.is_open():
-    raise CircuitBreakerOpenError(...)
+### Example: 10 requests/sec with burst to 100
+```
+capacity = 100 tokens
+refill_rate = 10 tokens/sec
 
-# Make request...
+Scenario 1: Normal load
+  - Request 1: 100 tokens available → acquire 1 → 99 left
+  - Wait 0.1s: 100 tokens available (refilled) → acquire 1 → 99 left
+  - Result: 10 requests/sec sustained
 
-# Record success/failure
-self.circuit_breaker.record_success()  # or record_failure()
+Scenario 2: Burst
+  - Requests 1-100: All succeed (use all 100 tokens)
+  - Request 101: 0 tokens available → RATE LIMITED
+  - Wait 10s: 100 tokens refilled → Request 101 succeeds
+  - Result: Can burst up to 100 requests, then throttled to 10/sec
 ```
 
 ---
 
-## 📚 Related Documents
+## DUAL-LOCK DESIGN
 
-- **../phase2-observability/** - Related observability work
-- **../phase2-async-fixes.md** - Related async fixes
-- **../../AGENTS.md** - Project knowledge base
+### Why Dual-Lock?
+- `threading.Lock` blocks the entire thread (OK for sync)
+- `asyncio.Lock` is async-aware (required for async)
+- Can't use `threading.Lock` in async context (deadlock)
+- Can't use `asyncio.Lock` in sync context (not awaitable)
 
----
-
-## 💡 Key Insights
-
-1. **No new dependencies needed** - httpx already in requirements.txt
-2. **Backward compatible** - CB can be disabled via config
-3. **Isolated implementation** - New file, minimal changes to existing code
-4. **Thread-safe design** - Consider locks for multi-threaded use
-5. **Observable** - Comprehensive logging at every state transition
-
----
-
-## ⚠️ Critical Issues Fixed
-
-### Issue 1: Missing Async Client
-**Before**: `_get_async_client()` called but not defined  
-**After**: Properly implemented with httpx.AsyncClient
-
-### Issue 2: Uninitialized async_client
-**Before**: `self.async_client` referenced but never initialized  
-**After**: Initialized to None in __init__
+### Implementation
+```python
+class TokenBucket:
+    def __init__(self, capacity, refill_rate):
+        self._sync_lock = threading.Lock()      # For _make_request()
+        self._async_lock = None                 # Lazy init for _make_request_async()
+    
+    def try_acquire(self, cost=1):
+        with self._sync_lock:
+            # Update tokens and check
+    
+    async def try_acquire_async(self, cost=1):
+        if self._async_lock is None:
+            self._async_lock = asyncio.Lock()
+        async with self._async_lock:
+            # Update tokens and check
+```
 
 ---
 
-## 🎓 Learning Resources
+## INTEGRATION WITH CIRCUIT BREAKER
 
-- **Circuit Breaker Pattern**: https://martinfowler.com/bliki/CircuitBreaker.html
-- **httpx Documentation**: https://www.python-httpx.org/
-- **structlog Guide**: https://www.structlog.org/
+### Order of Checks
+```
+_make_request():
+  1. Check rate limit (NEW)
+     ├─ If limited: raise RateLimitError
+     └─ If OK: continue
+  
+  2. Check circuit breaker (EXISTING)
+     ├─ If open: raise CircuitBreakerOpenError
+     └─ If OK: continue
+  
+  3. Make HTTP request (EXISTING)
+     ├─ On success: record_success()
+     └─ On failure: record_failure()
+```
+
+### Why This Order?
+- Rate limit is cheaper to check (no state machine)
+- Circuit breaker is more critical (prevents cascading failures)
+- Both are independent concerns
 
 ---
 
-## 📞 Questions?
+## ESTIMATED EFFORT
 
-Refer to the specific document:
-- **What are we building?** → summary.md
-- **How does it work?** → circuit-breaker-analysis.md
-- **How do I implement it?** → implementation-plan.md
-- **What's the code?** → code-snippets.md
+| Task | Time |
+|------|------|
+| Create rate_limiter.py | 1 hour |
+| Integrate into HTTPProvider | 30 min |
+| Unit tests | 1.5 hours |
+| Integration tests | 1 hour |
+| Run full test suite | 30 min |
+| Update documentation | 30 min |
+| Create beads | 15 min |
+| **Total** | **5.5 hours** |
 
 ---
 
-**Document Version**: 1.0  
-**Last Updated**: 2026-02-14  
-**Author**: Sisyphus-Junior  
-**Status**: ✅ Ready for Implementation
+## NEXT STEPS
+
+1. **Read** `rate-limiting-plan.md` for complete understanding
+2. **Use** `implementation-checklist.md` to execute
+3. **Follow** the 7-task breakdown in checklist
+4. **Verify** with success criteria at the end
+
+---
+
+## DESIGN DECISIONS SUMMARY
+
+| Decision | Choice | Why |
+|----------|--------|-----|
+| Algorithm | Token Bucket | Handles bursts, simple, no external deps |
+| Locking | Dual-Lock | Correct for both sync and async paths |
+| Error Strategy | Fail-Fast | Consistent with Circuit Breaker |
+| Config Location | DEFAULT_CONFIG | Centralized, per-provider override |
+
+---
+
+**Status**: ✅ Ready for Implementation  
+**Next Phase**: Phase 2.2 - Rate Limiting Implementation
