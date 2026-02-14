@@ -49,10 +49,10 @@ class EnhancedCLI:
     def _load_config(self) -> Dict[str, Any]:
         """Load CLI configuration with smart defaults"""
         return {
-            "default_model": os.getenv("PRIMARY_MODEL", "qwen-vision"),
-            "default_output_dir": os.getenv("DOCFLOW_OUTPUT_DIR", "./output"),
-            "auto_ocr": os.getenv("DOCFLOW_AUTO_OCR", "smart").lower(),
-            "batch_size": int(os.getenv("DOCFLOW_BATCH_SIZE", "4")),
+            "default_model": settings.primary_model,
+            "default_output_dir": settings.docflow_output_dir,
+            "auto_ocr": settings.auto_ocr.lower(),
+            "batch_size": settings.batch_size,
             "preferred_models": os.getenv(
                 "DOCFLOW_PREFERRED_MODELS",
                 "openrouter-gemini-flash,qwen-vision,fallback",
@@ -791,18 +791,27 @@ def interactive_config():
         config_display.add_column("Setting", style="cyan")
         config_display.add_column("Value", style="green")
 
-        env_vars = [
-            ("PRIMARY_MODEL", "Default AI Model"),
-            ("DOCFLOW_OUTPUT_DIR", "Output Directory"),
-            ("DOCFLOW_AUTO_OCR", "Auto-OCR Mode"),
-            ("DOCFLOW_BATCH_SIZE", "Batch Size"),
-            ("OPENROUTER_API_KEY", "OpenRouter API Key"),
+        config_items = [
+            ("primary_model", "Default AI Model"),
+            ("docflow_output_dir", "Output Directory"),
+            ("auto_ocr", "Auto-OCR Mode"),
+            ("batch_size", "Batch Size"),
+            ("openrouter_api_key", "OpenRouter API Key"),
         ]
 
-        for env_var, description in env_vars:
-            value = os.getenv(env_var, "Not Set")
-            if "API_KEY" in env_var and value != "Not Set":
-                value = f"{'*' * 20}{value[-8:]}"  # Mask API key
+        for attr, description in config_items:
+            value = getattr(settings, attr, "Not Set")
+            if value is None:
+                value = "Not Set"
+            else:
+                value = str(value)
+
+            if "api_key" in attr and value != "Not Set":
+                if len(value) > 8:
+                    value = f"{'*' * 20}{value[-8:]}"  # Mask API key
+                else:
+                    value = "********"
+
             config_display.add_row(description, value)
 
         console.print(config_display)
