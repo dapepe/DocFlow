@@ -10,6 +10,8 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List
 import structlog
 
+from docflow.circuit_breaker import CircuitBreaker, CircuitBreakerOpenError
+
 logger = structlog.get_logger(__name__)
 
 
@@ -192,7 +194,9 @@ class HTTPProvider(BaseProvider):
         """Initialize HTTP provider with session management."""
         super().__init__()
         self.session = None  # Initialized on first use
+        self.async_client = None  # Initialized on first async use
         self.headers = self._setup_headers()
+        self.circuit_breaker = CircuitBreaker()
 
     @abstractmethod
     def _setup_headers(self) -> Dict[str, str]:
@@ -226,20 +230,46 @@ class HTTPProvider(BaseProvider):
 
         return self.session
 
+    async def _get_async_client(self):
+        """Get or create async HTTP client with connection pooling."""
+        if self.async_client is None or self.async_client.is_closed():
+            import httpx
+
+            timeout = httpx.Timeout(self.config.get("timeout", 60))
+            limits = httpx.Limits(
+                max_connections=10,
+                max_keepalive_connections=5,
+            )
+
+            self.async_client = httpx.AsyncClient(timeout=timeout, limits=limits)
+
+            logger.debug(
+                "async_http_client_created",
+                timeout=self.config.get("timeout", 60),
+                max_connections=10,
+            )
+
+        return self.async_client
+
     async def _make_request_async(
         self, method: str, url: str, json_data: Optional[Dict] = None, **kwargs
     ) -> Dict[str, Any]:
         """
-        Make async HTTP request with error handling.
+        Make async HTTP request with error handling and circuit breaker protection.
         """
+        # Check if circuit breaker allows execution
+        self.circuit_breaker.can_execute()
+
         client = await self._get_async_client()
         try:
             response = await client.request(
                 method=method, url=url, json=json_data, **kwargs
             )
             response.raise_for_status()
+            self.circuit_breaker.record_success()
             return response.json()
         except Exception as e:
+            self.circuit_breaker.record_failure()
             logger.error(
                 "async_http_request_failed", error=str(e), error_type=type(e).__name__
             )
@@ -260,7 +290,7 @@ class HTTPProvider(BaseProvider):
         self, method: str, url: str, json_data: Optional[Dict] = None, **kwargs
     ) -> Dict[str, Any]:
         """
-        Make HTTP request with retry logic.
+        Make HTTP request with retry logic and circuit breaker protection.
 
         Args:
             method: HTTP method (GET, POST, etc.)
@@ -271,6 +301,9 @@ class HTTPProvider(BaseProvider):
         Returns:
             Response data as dictionary
         """
+        # Check if circuit breaker allows execution
+        self.circuit_breaker.can_execute()
+
         session = self._get_session()
 
         try:
@@ -283,9 +316,11 @@ class HTTPProvider(BaseProvider):
                 **kwargs,
             )
             response.raise_for_status()
+            self.circuit_breaker.record_success()
             return response.json()
 
         except Exception as e:
+            self.circuit_breaker.record_failure()
             logger.error(
                 "http_request_failed",
                 method=method,
