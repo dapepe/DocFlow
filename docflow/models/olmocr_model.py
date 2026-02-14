@@ -9,9 +9,9 @@ import os
 from typing import Dict, Any
 from .providers import LlamaCppProvider
 from . import ModelRegistry
-import logging
+import structlog
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class OlmOCRModel(LlamaCppProvider):
@@ -44,7 +44,7 @@ class OlmOCRModel(LlamaCppProvider):
         super().__init__()
         # olmOCR works best with specific settings
         if self.config["n_ctx"] < 4096:
-            logger.info("olmOCR: Using minimum context window of 4096 for OCR tasks")
+            logger.info("olmocr_context_window_adjusted", n_ctx=4096)
             self.config["n_ctx"] = 4096
 
     def get_capabilities(self) -> Dict[str, bool]:
@@ -63,4 +63,4 @@ class OlmOCRModel(LlamaCppProvider):
 
 # Register the model
 ModelRegistry.register("olmocr-7b", OlmOCRModel)
-logger.info("Registered olmocr-7b model (llama.cpp GGUF)")
+logger.info("model_registered", model_id="olmocr-7b", provider="llama.cpp")

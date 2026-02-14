@@ -9,9 +9,9 @@ import os
 from typing import Dict, Any
 from .providers import LlamaCppProvider
 from . import ModelRegistry
-import logging
+import structlog
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class Llama32VisionModel(LlamaCppProvider):

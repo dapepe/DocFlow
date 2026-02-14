@@ -9,9 +9,9 @@ import os
 from typing import Dict, Any, Optional
 from .providers import LlamaCppProvider
 from . import ModelRegistry
-import logging
+import structlog
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class Qwen25VLModel(LlamaCppProvider):
@@ -44,7 +44,9 @@ class Qwen25VLModel(LlamaCppProvider):
         # Qwen2.5-VL works best with larger context for documents
         if self.config["n_ctx"] < 8192:
             logger.warning(
-                "Qwen2.5-VL: Consider increasing LLAMA_CPP_N_CTX to 8192 or higher for documents"
+                "qwen25vl_context_window_suboptimal",
+                current_n_ctx=self.config["n_ctx"],
+                recommended_n_ctx=8192,
             )
 
     def get_capabilities(self) -> Dict[str, bool]:
@@ -63,4 +65,4 @@ class Qwen25VLModel(LlamaCppProvider):
 
 # Register the model
 ModelRegistry.register("qwen2.5-vl", Qwen25VLModel)
-logger.info("Registered qwen2.5-vl model (llama.cpp GGUF)")
+logger.info("model_registered", model_id="qwen2.5-vl", provider="llama.cpp")
