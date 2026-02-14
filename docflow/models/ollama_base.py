@@ -6,7 +6,7 @@ Provides shared functionality for Ollama-based models
 import os
 import json
 import re
-import logging
+import structlog
 import requests
 from typing import Dict, Any, Optional, List
 from .providers.base import HTTPProvider
@@ -19,7 +19,7 @@ from ..performance_optimizer import (
     optimize_text_extraction,
 )
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class OllamaBaseModel(HTTPProvider):
@@ -39,7 +39,7 @@ class OllamaBaseModel(HTTPProvider):
         self.capabilities.local = True
         self.capabilities.structured_output = True
 
-        logger.info(f"Initialized Ollama model: {self.model}")
+        logger.info("ollama_model_initialized", model_name=self.model)
 
     def _load_config(self) -> Dict[str, Any]:
         """Load configuration from centralized settings"""
@@ -89,7 +89,7 @@ class OllamaBaseModel(HTTPProvider):
             with open(schema_path, "r") as f:
                 return json.load(f)
         except Exception as e:
-            logger.error(f"Failed to load schema from {schema_path}: {e}")
+            logger.error("schema_load_failed", schema_path=schema_path, error=str(e))
             raise
 
     def _generate_enhanced_prompt(
@@ -198,12 +198,12 @@ class OllamaBaseModel(HTTPProvider):
             }
 
             if not is_valid:
-                logger.warning(f"Ollama response validation issues: {errors}")
+                logger.warning("ollama_validation_failed", validation_errors=errors)
 
             return result
 
         except Exception as e:
-            logger.error(f"Error in Ollama analysis: {e}")
+            logger.error("ollama_analysis_error", error=str(e))
             return {
                 "success": False,
                 "error": str(e),
@@ -255,12 +255,12 @@ class OllamaBaseModel(HTTPProvider):
             }
 
             if not is_valid:
-                logger.warning(f"Ollama response validation issues: {errors}")
+                logger.warning("ollama_validation_failed", validation_errors=errors)
 
             return result
 
         except Exception as e:
-            logger.error(f"Error in Ollama analysis: {e}")
+            logger.error("ollama_analysis_error", error=str(e))
             return {
                 "success": False,
                 "error": str(e),

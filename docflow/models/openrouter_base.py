@@ -6,7 +6,7 @@ Provides shared functionality for OpenRouter-based vision models
 import os
 import json
 import base64
-import logging
+import structlog
 from typing import Dict, Any, Optional, List
 from .providers.base import HTTPProvider
 from ..settings import settings
@@ -18,7 +18,7 @@ from ..performance_optimizer import (
     optimize_text_extraction,
 )
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class OpenRouterBaseModel(HTTPProvider):
@@ -38,7 +38,7 @@ class OpenRouterBaseModel(HTTPProvider):
         self.capabilities.vision = True
         self.capabilities.structured_output = True
 
-        logger.info(f"Initialized OpenRouter model: {self.model}")
+        logger.info("openrouter_model_initialized", model_name=self.model)
 
     def _load_config(self) -> Dict[str, Any]:
         """Load configuration from centralized settings"""
@@ -78,7 +78,7 @@ class OpenRouterBaseModel(HTTPProvider):
             with open(schema_path, "r") as f:
                 return json.load(f)
         except Exception as e:
-            logger.error(f"Failed to load schema from {schema_path}: {e}")
+            logger.error("schema_load_failed", schema_path=schema_path, error=str(e))
             raise
 
     def _generate_enhanced_prompt(
@@ -212,13 +212,13 @@ class OpenRouterBaseModel(HTTPProvider):
 
                     if not is_valid:
                         logger.warning(
-                            f"OpenRouter response validation issues: {errors}"
+                            "openrouter_validation_failed", validation_errors=errors
                         )
 
                     return result
 
                 except json.JSONDecodeError as e:
-                    logger.error(f"Failed to parse OpenRouter response: {e}")
+                    logger.error("openrouter_json_parse_failed", error=str(e))
                     return {
                         "success": False,
                         "error": "Invalid JSON response from OpenRouter",
@@ -226,7 +226,7 @@ class OpenRouterBaseModel(HTTPProvider):
                         "provider": "OpenRouter",
                     }
             else:
-                logger.error("Empty response from OpenRouter API")
+                logger.error("openrouter_empty_response")
                 return {
                     "success": False,
                     "error": "Empty response from OpenRouter",
@@ -235,7 +235,7 @@ class OpenRouterBaseModel(HTTPProvider):
                 }
 
         except Exception as e:
-            logger.error(f"Error in OpenRouter analysis: {e}")
+            logger.error("openrouter_analysis_error", error=str(e))
             return {
                 "success": False,
                 "error": str(e),
@@ -319,13 +319,13 @@ class OpenRouterBaseModel(HTTPProvider):
 
                     if not is_valid:
                         logger.warning(
-                            f"OpenRouter response validation issues: {errors}"
+                            "openrouter_validation_failed", validation_errors=errors
                         )
 
                     return result
 
                 except json.JSONDecodeError as e:
-                    logger.error(f"Failed to parse OpenRouter response: {e}")
+                    logger.error("openrouter_json_parse_failed", error=str(e))
                     return {
                         "success": False,
                         "error": "Invalid JSON response from OpenRouter",
@@ -333,7 +333,7 @@ class OpenRouterBaseModel(HTTPProvider):
                         "provider": "OpenRouter",
                     }
             else:
-                logger.error("Empty response from OpenRouter API")
+                logger.error("openrouter_empty_response")
                 return {
                     "success": False,
                     "error": "Empty response from OpenRouter",
@@ -342,7 +342,7 @@ class OpenRouterBaseModel(HTTPProvider):
                 }
 
         except Exception as e:
-            logger.error(f"Error in OpenRouter analysis: {e}")
+            logger.error("openrouter_analysis_error", error=str(e))
             return {
                 "success": False,
                 "error": str(e),

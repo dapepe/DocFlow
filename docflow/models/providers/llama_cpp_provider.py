@@ -8,14 +8,14 @@ Offers lower overhead than Ollama HTTP API with full hardware control.
 import os
 import base64
 import json
-import logging
+import structlog
 from typing import Dict, Any, Optional, List, Union
 from pathlib import Path
 from .base import LocalProvider
 from ...prompt_manager import prompt_manager
 from ...response_validator import ResponseValidator
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class LlamaCppProvider(LocalProvider):
@@ -49,7 +49,7 @@ class LlamaCppProvider(LocalProvider):
         self.schema = self._load_schema()
         self.validator = ResponseValidator(self.schema)
 
-        logger.info(f"Initialized LlamaCppProvider: model_path={self.model_path}")
+        logger.info("llama_cpp_provider_initialized", model_path=self.model_path)
 
     def _load_config(self) -> Dict[str, Any]:
         """Load configuration from environment variables with defaults."""
@@ -72,10 +72,15 @@ class LlamaCppProvider(LocalProvider):
                 try:
                     config[config_key] = type_func(value)
                     logger.debug(
-                        f"Loaded config {config_key}={config[config_key]} from {env_var}"
+                        "llama_cpp_config_loaded",
+                        config_key=config_key,
+                        value=config[config_key],
+                        env_var=env_var,
                     )
                 except (ValueError, TypeError) as e:
-                    logger.warning(f"Invalid value for {env_var}: {e}")
+                    logger.warning(
+                        "llama_cpp_invalid_config", env_var=env_var, error=str(e)
+                    )
 
         return config
 
@@ -89,7 +94,8 @@ class LlamaCppProvider(LocalProvider):
             from llama_cpp import Llama
         except ImportError:
             logger.error(
-                "llama-cpp-python not installed. Install with: pip install llama-cpp-python"
+                "llama_cpp_python_not_installed",
+                message="Install with: pip install llama-cpp-python",
             )
             raise RuntimeError("llama-cpp-python is required for GGUF models")
 
@@ -98,9 +104,12 @@ class LlamaCppProvider(LocalProvider):
 
         n_threads = self.config["n_threads"] or os.cpu_count()
 
-        logger.info(f"Loading GGUF model from {self.model_path}")
+        logger.info("llama_cpp_model_loading", model_path=self.model_path)
         logger.info(
-            f"Config: n_ctx={self.config['n_ctx']}, n_threads={n_threads}, n_gpu_layers={self.config['n_gpu_layers']}"
+            "llama_cpp_config",
+            n_ctx=self.config["n_ctx"],
+            n_threads=n_threads,
+            n_gpu_layers=self.config["n_gpu_layers"],
         )
 
         try:
@@ -112,10 +121,10 @@ class LlamaCppProvider(LocalProvider):
                 verbose=self.config["verbose"],
                 chat_format=self.config["chat_format"],
             )
-            logger.info(f"Successfully loaded model: {self.model_path}")
+            logger.info("llama_cpp_model_loaded", model_path=self.model_path)
             return llm
         except Exception as e:
-            logger.error(f"Failed to load GGUF model: {e}")
+            logger.error("llama_cpp_model_load_failed", error=str(e))
             raise RuntimeError(f"Model loading failed: {e}")
 
     def _ensure_model_loaded(self):
@@ -130,7 +139,7 @@ class LlamaCppProvider(LocalProvider):
             with open(schema_path, "r") as f:
                 return json.load(f)
         except Exception as e:
-            logger.error(f"Failed to load schema from {schema_path}: {e}")
+            logger.error("schema_load_failed", schema_path=schema_path, error=str(e))
             raise
 
     def _generate_enhanced_prompt(
@@ -231,11 +240,13 @@ class LlamaCppProvider(LocalProvider):
                 elif "content" in response:
                     return response["content"]
 
-            logger.warning(f"Unexpected response format: {type(response)}")
+            logger.warning(
+                "unexpected_response_format", response_type=str(type(response))
+            )
             return str(response)
 
         except Exception as e:
-            logger.error(f"Generation failed: {e}")
+            logger.error("llama_cpp_generation_failed", error=str(e))
             raise RuntimeError(f"Model generation failed: {e}")
 
     def extract_information(
@@ -262,9 +273,11 @@ class LlamaCppProvider(LocalProvider):
             if image_path:
                 try:
                     images = [self._encode_image(image_path)]
-                    logger.debug(f"Encoded image: {image_path}")
+                    logger.debug("image_encoded", image_path=image_path)
                 except Exception as e:
-                    logger.warning(f"Failed to encode image {image_path}: {e}")
+                    logger.warning(
+                        "image_encoding_failed", image_path=image_path, error=str(e)
+                    )
 
             # Generate response
             response_text = self.generate(prompt, images=images)
@@ -308,12 +321,12 @@ class LlamaCppProvider(LocalProvider):
             }
 
             if not is_valid:
-                logger.warning(f"Response validation issues: {errors}")
+                logger.warning("llama_cpp_validation_failed", validation_errors=errors)
 
             return result
 
         except Exception as e:
-            logger.error(f"Information extraction failed: {e}")
+            logger.error("llama_cpp_extraction_failed", error=str(e))
             return {
                 "success": False,
                 "error": str(e),
@@ -359,14 +372,22 @@ class LlamaCppProvider(LocalProvider):
             model_path = cls._get_model_path()
 
             if not model_path:
-                logger.debug(f"{cls.__name__}: No model path configured")
+                logger.debug("llama_cpp_no_model_path", class_name=cls.__name__)
                 return False
 
             exists = Path(model_path).exists()
             if exists:
-                logger.info(f"{cls.__name__}: GGUF model found at {model_path}")
+                logger.info(
+                    "llama_cpp_model_found",
+                    class_name=cls.__name__,
+                    model_path=model_path,
+                )
             else:
-                logger.debug(f"{cls.__name__}: GGUF model not found at {model_path}")
+                logger.debug(
+                    "llama_cpp_model_not_found",
+                    class_name=cls.__name__,
+                    model_path=model_path,
+                )
 
             return exists
 
@@ -374,7 +395,11 @@ class LlamaCppProvider(LocalProvider):
             # Base class doesn't implement _get_model_path
             return False
         except Exception as e:
-            logger.error(f"Error checking availability for {cls.__name__}: {e}")
+            logger.error(
+                "llama_cpp_availability_check_failed",
+                class_name=cls.__name__,
+                error=str(e),
+            )
             return False
 
     def get_capabilities(self) -> Dict[str, bool]:
