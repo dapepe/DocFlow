@@ -28,9 +28,17 @@ class PerformanceCache:
         self.lock = threading.RLock()
 
     def _generate_key(self, text: str, model_name: str, schema: Dict[str, Any]) -> str:
-        """Generate cache key from input parameters"""
-        content = f"{text[:500]}:{model_name}:{json.dumps(schema, sort_keys=True)}"
-        return hashlib.md5(content.encode()).hexdigest()
+        """Generate cache key from input parameters using SHA-256"""
+        # Normalize text (remove excess whitespace) to improve hit rate
+        normalized_text = " ".join(text.split())
+
+        # Include full schema structure
+        schema_str = json.dumps(schema, sort_keys=True)
+
+        # Combine elements
+        content = f"{normalized_text}:{model_name}:{schema_str}"
+
+        return hashlib.sha256(content.encode()).hexdigest()
 
     def get(
         self, text: str, model_name: str, schema: Dict[str, Any]
