@@ -1,35 +1,35 @@
+# Core Application
+aiofiles>=23.0.0
 click>=8.1.8
-docling>=2.14.0
 fastapi>=0.115.6
-pypdf2>=3.0.1
+pydantic-settings>=2.0.0
 python-dateutil>=2.9.0
-python-docx>=1.1.2
 python-multipart>=0.0.20
 pyyaml>=6.0.2
-rich>=13.9.4
-uvicorn>=0.34.0
-google-generativeai>=0.8.0
-openai>=1.0.0
-ollama>=0.4.0
-twilio>=8.0.0
-pdf2image>=1.17.0
-trafilatura>=1.12.0
-pillow>=10.0.0
-
-# llama.cpp support (requires build tools: cmake, build-essential)
-llama-cpp-python>=0.3.0
-
-# Layout processing (optional but recommended)
-pdfplumber>=0.11.0
-
-# Optional: GPU memory detection for auto-configuration
-# pynvml>=11.0.0
-
-# Optional: Direct API SDKs
-anthropic>=0.40.0
-aiohttp>=3.9.0
-requests>=2.31.0
-pydantic-settings>=2.0.0
-httpx>=0.27.0
-aiofiles>=23.0.0
 structlog>=24.1.0
+uvicorn>=0.34.0
+
+# Document Processing
+docling>=2.14.0
+pdf2image>=1.17.0
+pdfplumber>=0.11.0
+pillow>=10.0.0
+pypdf2>=3.0.1
+python-docx>=1.1.2
+trafilatura>=1.12.0
+
+# Networking & APIs
+aiohttp>=3.9.0
+httpx>=0.27.0
+requests>=2.31.0
+twilio>=8.0.0
+
+# AI Models & Providers
+anthropic>=0.40.0
+google-generativeai>=0.8.0
+llama-cpp-python>=0.3.0
+ollama>=0.4.0
+openai>=1.0.0
+
+# Optional / Hardware
+# pynvml>=11.0.0  # GPU memory detection

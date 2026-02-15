@@ -27,6 +27,9 @@ You are an expert document processor with advanced OCR and information extractio
 **Context Hints:**
 {context_hints}
 
+**Model Instructions:**
+{model_instructions}
+
 **Output Format Requirements:**
 - Provide ONLY valid JSON response matching the schema
 - No additional commentary or explanations
