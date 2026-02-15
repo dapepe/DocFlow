@@ -22,6 +22,7 @@ import pdf2image
 import tempfile
 import aiofiles
 from concurrent.futures import ThreadPoolExecutor
+from .layout_processor import layout_processor
 
 logger = structlog.get_logger(__name__)
 
@@ -531,7 +532,11 @@ class DocumentProcessor:
             raise ValueError(f"Unsupported file format: {suffix}")
 
     async def process_document_async(
-        self, file_path: str, use_ocr: bool = False, convert_to_img: bool = False
+        self,
+        file_path: str,
+        use_ocr: bool = False,
+        convert_to_img: bool = False,
+        extract_structure: bool = False,
     ) -> Dict:
         """
         Async version of process_document.
@@ -543,6 +548,7 @@ class DocumentProcessor:
             file_path: Path to the document file
             use_ocr: Whether to use OCR for image-based documents
             convert_to_img: Whether to convert PDF to image for vision models
+            extract_structure: Whether to extract layout structure (tables, sections)
 
         Returns:
             Dictionary containing extraction results
@@ -563,11 +569,25 @@ class DocumentProcessor:
                 image_path=image_path,
             )
 
+            # Extract layout structure if requested
+            layout_data = {}
+            if extract_structure:
+                try:
+                    # Layout extraction is CPU bound, run in executor
+                    loop = asyncio.get_event_loop()
+                    layout_data = await loop.run_in_executor(
+                        self.executor, layout_processor.extract_layout, file_path
+                    )
+                    logger.info("layout_extraction_complete", file_name=path.name)
+                except Exception as e:
+                    logger.warning("layout_extraction_failed", error=str(e))
+
             # Use AI model for enhanced extraction
             result = {
                 "file_name": path.name,
                 "text_length": len(text),
                 "text_content": text,
+                "layout": layout_data if layout_data else None,
             }
 
             try:
