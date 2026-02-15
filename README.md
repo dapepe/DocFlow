@@ -14,13 +14,17 @@ DocFlow is an advanced document processing system that supports PDF, DOCX, TXT, 
 - **Enterprise Ready**: Docker support, comprehensive logging, error handling
 
 ### AI Model Support
-- **🎯 Qwen2.5 Vision** (qwen-vision) - Default model with advanced multilingual capabilities
+- **🎯 Qwen2.5 Vision** (qwen-vision / qwen2.5-vl) - Multilingual vision model (Ollama or llama.cpp)
 - **💎 Granite3.2 Vision** (granite-vision) - IBM's enterprise document understanding
 - **⚡ Gemma3** (gemma) - Google's efficient 12B parameter model
 - **🦙 LLaVA** (llava) - Popular vision-language model
-- **🦙 Llama Vision** (llama-vision) - Meta's balanced vision-text analysis
+- **🦙 Llama Vision** (llama-vision / llama3.2-vision) - Meta's balanced vision-text analysis
 - **🔬 Mistral Document AI** (mistral-document) - Advanced OCR and document processing
 - **🧠 GPT-4 Vision** (gpt4-vision) - OpenAI's premier vision model
+- **⚡ Claude 3.7 Sonnet** (claude-vision) - Anthropic's latest reasoning model (Direct API)
+- **🏃 Gemini 2.0 Flash** (gemini-vision) - Google's ultra-fast multimodal model (Direct API)
+- **🔍 olmOCR** (olmocr-7b) - Specialized OCR model for accurate text extraction (llama.cpp)
+- **📄 Docling** (docling-local) - Advanced layout analysis and table extraction
 - **⚙️ Fallback Model** (fallback) - Rule-based processing for offline use
 
 ## 📋 Requirements
@@ -29,11 +33,11 @@ DocFlow is an advanced document processing system that supports PDF, DOCX, TXT, 
 - **System Dependencies**:
   - Poppler (PDF processing)
   - Pillow (image processing)
+  - CMake & Build Tools (for llama.cpp)
 - **AI Services** (optional):
   - Ollama (local models)
-  - OpenAI API (GPT-4)
-  - Mistral API
-  - Google API (Gemini)
+  - llama.cpp (embedded GGUF models)
+  - OpenAI / Anthropic / Google / Mistral APIs
 
 ## ⚙️ Configuration
 
@@ -136,7 +140,18 @@ nano .env
 
 ### 3. AI Model Setup
 
-**For Ollama Models (Local):**
+**Option A: llama.cpp (Recommended for Local Use)**
+DocFlow now supports direct GGUF inference via llama.cpp, which is faster and lighter than Ollama.
+
+1. Download GGUF models (see `env.template.txt` for links).
+2. Configure paths in `.env`:
+   ```bash
+   LLAMA_CPP_QWEN25_VL_PATH=/path/to/qwen2.5-vl.gguf
+   LLAMA_CPP_LLAMA32_VISION_PATH=/path/to/llama3.2-vision.gguf
+   ```
+3. DocFlow will auto-detect GPU and optimize settings.
+
+**Option B: Ollama (Alternative Local)**
 ```bash
 # Install Ollama
 curl -fsSL https://ollama.ai/install.sh | sh
@@ -144,27 +159,22 @@ curl -fsSL https://ollama.ai/install.sh | sh
 # Pull required models
 ollama pull qwen2.5vl:7b
 ollama pull granite3.2-vision:latest
-ollama pull gemma3:12b
-ollama pull llava:latest
-ollama pull llama3.2-vision:latest
 ```
 
-**For API Models:**
-- Add your API keys to `.env`
-- OpenAI: `OPENAI_API_KEY=sk-...`
-- Mistral: `MISTRAL_API_KEY=your_key`
+**Option C: Cloud APIs (Best Performance)**
+- Add API keys to `.env` for OpenAI, Anthropic, Google, Mistral, or OpenRouter.
 
 ### 4. Run the Application
 
 ```bash
+# Validate configuration
+python main.py config
+
+# Run benchmarks
+python main.py benchmark --document test.pdf --models qwen2.5-vl claude-vision
+
 # Start API server
 python main.py serve --host 0.0.0.0 --port 8000
-
-# Process single document
-python main.py process document.pdf --model qwen-vision --verbose
-
-# List available models
-python main.py models
 ```
 
 ## 🔧 Usage
