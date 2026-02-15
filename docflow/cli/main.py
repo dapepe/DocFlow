@@ -9,7 +9,10 @@ import uvicorn
 from .processor import DocumentProcessor
 import structlog
 import os
+import json
+import time
 from .models import ModelRegistry
+from ..performance_optimizer import get_performance_report
 
 # Import enhanced CLI features
 from .enhanced_cli import enhanced_cli, show_interactive_menu
@@ -82,16 +85,175 @@ def cli(ctx, version, verbose):
 def models(verbose):
     """List available AI models"""
     processor = DocumentProcessor()
-    models = processor.get_supported_models()
+    # Need to access registry directly to get model instances for capabilities
+    models = ModelRegistry.list_models()
 
     table = Table(title="Available AI Models")
     table.add_column("Model ID", style="cyan")
     table.add_column("Description", style="green")
+    table.add_column("Capabilities", style="yellow")
 
     for model_id, description in models.items():
-        table.add_row(model_id, description)
+        capabilities = []
+        try:
+            model_class = ModelRegistry.get_model(model_id)
+            if model_class:
+                # Instantiate to get capabilities (might be heavy if model loads on init, but we designed lazy loading)
+                # Actually, capabilities should be checkable without full load if possible,
+                # but our design instantiates in __init__.
+                # However, LocalProvider lazy loads in _ensure_model_loaded.
+                # HTTPProvider is light.
+                # So safe to instantiate.
+                model_instance = model_class()
+                caps = model_instance.get_capabilities()
+                if caps.get("vision"):
+                    capabilities.append("Vision")
+                if caps.get("ocr"):
+                    capabilities.append("OCR")
+                if caps.get("local"):
+                    capabilities.append("Local")
+                if caps.get("fast"):
+                    capabilities.append("Fast")
+                if caps.get("gpu_acceleration"):
+                    capabilities.append("GPU")
+        except Exception:
+            pass
+
+        table.add_row(model_id, description, ", ".join(capabilities))
 
     console.print(table)
+
+
+@cli.command()
+@click.option(
+    "--document", type=click.Path(exists=True), required=True, help="Test document path"
+)
+@click.option(
+    "--models", "-m", multiple=True, help="Models to benchmark (default: all available)"
+)
+@click.option("--iterations", "-n", default=1, help="Number of iterations per model")
+@verbose_option
+def benchmark(document, models, iterations, verbose):
+    """Benchmark model performance"""
+    console.print(
+        Panel(f"Benchmarking with document: {document}", title="Performance Benchmark")
+    )
+
+    available = ModelRegistry.list_models()
+    target_models = models if models else list(available.keys())
+
+    # Filter out fallback if not explicitly requested
+    if not models and "fallback" in target_models:
+        target_models.remove("fallback")
+
+    results = []
+
+    with console.status("[bold green]Running benchmark..."):
+        for model_id in target_models:
+            if model_id not in available:
+                console.print(f"[yellow]Skipping unknown model: {model_id}[/yellow]")
+                continue
+
+            console.print(f"Testing {model_id}...", style="blue")
+            durations = []
+            success_count = 0
+
+            try:
+                processor = DocumentProcessor(ai_model=model_id)
+
+                for i in range(iterations):
+                    start = time.time()
+                    # Force OCR for fair comparison if models support it
+                    res = processor.process_document(document, use_ocr=False)
+                    duration = time.time() - start
+
+                    if res.get("ai_analysis", {}).get("success"):
+                        success_count += 1
+                        durations.append(duration)
+
+            except Exception as e:
+                logger.error("benchmark_error", model=model_id, error=str(e))
+
+            if durations:
+                avg_time = sum(durations) / len(durations)
+                results.append(
+                    {
+                        "model": model_id,
+                        "avg_time": avg_time,
+                        "success_rate": f"{success_count}/{iterations}",
+                        "min_time": min(durations),
+                        "max_time": max(durations),
+                    }
+                )
+            else:
+                results.append(
+                    {
+                        "model": model_id,
+                        "avg_time": float("inf"),
+                        "success_rate": "0/0",
+                        "min_time": 0,
+                        "max_time": 0,
+                    }
+                )
+
+    # Display results
+    table = Table(title="Benchmark Results")
+    table.add_column("Model", style="cyan")
+    table.add_column("Avg Time (s)", style="green")
+    table.add_column("Min/Max (s)", style="blue")
+    table.add_column("Success Rate", style="yellow")
+
+    # Sort by speed
+    results.sort(key=lambda x: x["avg_time"])
+
+    for r in results:
+        avg = f"{r['avg_time']:.2f}" if r["avg_time"] != float("inf") else "N/A"
+        min_max = f"{r['min_time']:.2f} / {r['max_time']:.2f}"
+        table.add_row(r["model"], avg, min_max, r["success_rate"])
+
+    console.print(table)
+
+
+@cli.command()
+def config():
+    """Validate and display configuration"""
+    from ..settings import settings
+
+    table = Table(title="Current Configuration")
+    table.add_column("Category", style="cyan")
+    table.add_column("Setting", style="blue")
+    table.add_column("Value", style="green")
+
+    # API Settings
+    table.add_row("API", "Host", settings.host)
+    table.add_row("API", "Port", str(settings.port))
+
+    # Model Settings
+    table.add_row("Models", "Primary Model", settings.primary_model)
+    table.add_row("Models", "Ollama Host", settings.ollama_host)
+
+    # Provider Keys (masked)
+    for provider in ["OPENAI", "ANTHROPIC", "GOOGLE", "MISTRAL", "OPENROUTER"]:
+        key = getattr(settings, f"{provider.lower()}_api_key", None)
+        status = "✅ Configured" if key else "❌ Missing"
+        table.add_row("Providers", f"{provider} API Key", status)
+
+    # Cache Stats
+    stats = get_performance_report()
+    cache_stats = stats["cache_stats"]
+    table.add_row("Cache", "Entries", str(cache_stats.get("size", 0)))
+    table.add_row("Cache", "Max Size", str(cache_stats.get("max_size", 0)))
+
+    console.print(table)
+
+    # Validation check
+    from ..models.providers.quantization import detect_available_vram
+
+    vram, ram = detect_available_vram()
+
+    console.print("\n[bold]Hardware Detection:[/bold]")
+    console.print(f"VRAM: {vram:.2f} GB")
+    console.print(f"RAM:  {ram:.2f} GB")
 
 
 @cli.command()
