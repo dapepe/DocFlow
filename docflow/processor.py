@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any, Union
 from .models import BaseModel as BaseAIModel  # Alias for backward compatibility
 from .models import ModelRegistry
+from .model_router import model_router
 import structlog
 import re
 from typing import BinaryIO
@@ -46,7 +47,14 @@ class DocumentProcessor:
         )
 
         # Initialize AI model based on preference
-        self.ai_model = self._initialize_ai_model(ai_model)
+        if ai_model == "auto":
+            # Just set to fallback initially, will be routed dynamically
+            # Or better, let process_document handle routing per doc
+            self.ai_model_name = "auto"
+            self.ai_model = self._initialize_ai_model(None)  # Fallback
+        else:
+            self.ai_model_name = ai_model
+            self.ai_model = self._initialize_ai_model(ai_model)
 
         # Executor for CPU-bound tasks
         self.executor = ThreadPoolExecutor(max_workers=4)
