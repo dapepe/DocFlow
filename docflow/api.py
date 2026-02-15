@@ -245,13 +245,17 @@ async def batch_process_documents(
                     )
 
             # Process in batch
-            def single_process(file_path, use_ocr, **kwargs):
-                processor = DocumentProcessor(ai_model=model)
-                return processor.process_document(file_path, use_ocr)
+            file_paths = [doc["file_path"] for doc in documents]
 
-            results = batch_processor.process_batch(documents, single_process)
+            # Use async batch processor
+            processor = DocumentProcessor(ai_model=model)
+            results = await processor.process_batch_async(
+                file_paths=file_paths,
+                use_ocr=use_ocr,
+                max_concurrency=4,  # Could make this configurable
+            )
 
-            # Add original filenames to results
+            # Add original filenames to results (results order matches input)
             for i, result in enumerate(results):
                 result["original_filename"] = documents[i]["original_filename"]
 
