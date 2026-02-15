@@ -45,7 +45,7 @@ class LlamaCppProvider(LocalProvider):
         super().__init__()
         self.config = self._load_config()
         self.model_path = self._get_model_path()
-        self.llm = None  # Lazy loading - loaded on first use
+        # self.model is managed by LocalProvider base class
         self.schema = self._load_schema()
         self.validator = ResponseValidator(self.schema)
 
@@ -84,7 +84,8 @@ class LlamaCppProvider(LocalProvider):
 
         return config
 
-    def _get_model_path(self) -> str:
+    @classmethod
+    def _get_model_path(cls) -> str:
         """Get the GGUF model path. Override in subclasses."""
         raise NotImplementedError("Subclasses must implement _get_model_path()")
 
@@ -126,11 +127,6 @@ class LlamaCppProvider(LocalProvider):
         except Exception as e:
             logger.error("llama_cpp_model_load_failed", error=str(e))
             raise RuntimeError(f"Model loading failed: {e}")
-
-    def _ensure_model_loaded(self):
-        """Lazy load the model on first use."""
-        if self.llm is None:
-            self.llm = self._load_model()
 
     def _load_schema(self) -> dict:
         """Load JSON schema from file."""
@@ -217,12 +213,12 @@ class LlamaCppProvider(LocalProvider):
                     {"role": "user", "content": content_parts},
                 ]
 
-                response = self.llm.create_chat_completion(
+                response = self.model.create_chat_completion(
                     messages=messages, temperature=temp, max_tokens=max_tok
                 )
             else:
                 # Text-only generation
-                response = self.llm.create_completion(
+                response = self.model.create_completion(
                     prompt=prompt,
                     temperature=temp,
                     max_tokens=max_tok,
