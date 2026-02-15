@@ -14,6 +14,7 @@ from pathlib import Path
 from .base import LocalProvider
 from ...prompt_manager import prompt_manager
 from ...response_validator import ResponseValidator
+from . import quantization
 
 logger = structlog.get_logger(__name__)
 
@@ -66,6 +67,36 @@ class LlamaCppProvider(LocalProvider):
             "LLAMA_CPP_TEMPERATURE": ("temperature", float),
             "LLAMA_CPP_MAX_TOKENS": ("max_tokens", int),
         }
+
+        # Check for auto-GPU configuration
+        if os.getenv("LLAMA_CPP_AUTO_GPU_LAYERS", "").lower() in ("true", "1", "yes"):
+            try:
+                # Get model path (might not be available yet if called from __init__ before subclass init?)
+                # Wait, _load_config is called in __init__. _get_model_path is a classmethod.
+                # So we can call it.
+                model_path = self._get_model_path()
+                if model_path and os.path.exists(model_path):
+                    vram_gb, ram_gb = quantization.detect_available_vram()
+                    logger.info(
+                        "auto_gpu_config_detection",
+                        vram_gb=vram_gb,
+                        ram_gb=ram_gb,
+                        model_path=model_path,
+                    )
+
+                    if vram_gb > 0:
+                        layers = quantization.estimate_gpu_layers(model_path, vram_gb)
+                        config["n_gpu_layers"] = layers
+                        logger.info(
+                            "auto_gpu_layers_set",
+                            layers=layers,
+                            reason=f"Available VRAM: {vram_gb:.2f} GB",
+                        )
+                    else:
+                        logger.info("no_gpu_detected_using_cpu")
+                        config["n_gpu_layers"] = 0
+            except Exception as e:
+                logger.warning("auto_gpu_config_failed", error=str(e))
 
         for env_var, (config_key, type_func) in env_mapping.items():
             if value := os.getenv(env_var):
