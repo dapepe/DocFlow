@@ -5,12 +5,12 @@ Automatically selects the optimal model based on document characteristics.
 Routes to specialized models for specific document types, languages, and requirements.
 """
 
-import logging
+import structlog
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 from .models import ModelRegistry
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class ModelRouter:

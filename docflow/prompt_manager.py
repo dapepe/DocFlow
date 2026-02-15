@@ -5,11 +5,11 @@ Handles configurable prompts with placeholder substitution
 
 import os
 import json
-import logging
+import structlog
 from typing import Dict, Any, Optional
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class PromptManager:

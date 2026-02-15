@@ -6,7 +6,7 @@ Provides caching, request batching, and performance monitoring
 import time
 import hashlib
 import json
-import logging
+import structlog
 from typing import Dict, Any, Optional, List, Callable
 from functools import wraps
 from datetime import datetime, timedelta
@@ -14,7 +14,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class PerformanceCache:
@@ -50,7 +50,7 @@ class PerformanceCache:
 
                 # Update access time for LRU
                 self.access_times[key] = datetime.now()
-                logger.debug(f"Cache hit for key: {key[:8]}...")
+                logger.debug("cache_hit", key_prefix=key[:8])
                 return result
 
             return None

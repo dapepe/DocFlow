@@ -5,12 +5,12 @@ Extracts document structure, not just text.
 Identifies sections, tables, figures, and their spatial relationships.
 """
 
-import logging
+import structlog
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 @dataclass
