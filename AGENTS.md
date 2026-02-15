@@ -50,14 +50,58 @@ python main.py serve --host 0.0.0.0 --port 8000
 # Process Document (CLI)
 python main.py process path/to/doc.pdf --model qwen-vision
 
+# Benchmark Models
+python main.py benchmark --document test.pdf --models qwen2.5-vl claude-vision
+
+# Check Configuration
+python main.py config
+
 # Run Tests
 pytest tests/
 ```
 
 ## ARCHITECTURE NOTES
 *   **Model Plugin System**: Models self-register via `ModelRegistry`.
+*   **Unified Provider**: All models inherit from `BaseProvider`, with specialized `HTTPProvider` (Ollama, OpenRouter) and `LocalProvider` (llama.cpp, Docling).
+*   **Async Core**: `processor.py` and `api.py` fully support async/await for high concurrency.
+*   **Routing**: `ModelRouter` selects models based on document type (e.g., invoices -> Claude, simple -> Flash).
 *   **Dual-Core Issue**: `core.py` and `processor.py` exist. `processor.py` is the active implementation.
 *   **Hybrid Config**: Node.js `package.json` exists but project is primarily Python.
+
+## MODERNIZATION UPDATE (FEB 2026)
+Successfully completed the DocFlow Modernization initiative (`DocFlow-nty`).
+
+### Key Implementations
+1.  **Native llama.cpp Support**:
+    *   `LlamaCppProvider` base class with GGUF loading and auto-GPU offload.
+    *   Models: `qwen2.5-vl`, `llama3.2-vision`, `olmocr-7b`.
+    *   Quantization awareness and VRAM detection.
+
+2.  **Direct Cloud Integrations**:
+    *   `ClaudeVisionModel` (Anthropic SDK) for high-reasoning tasks.
+    *   `GeminiVisionModel` (Google GenAI SDK) for high-speed/volume tasks.
+
+3.  **Architecture Overhaul**:
+    *   **Async Processing**: Full async pipeline in `process_document_async` and batch endpoints.
+    *   **Unified Providers**: Refactored `Ollama` and `OpenRouter` to use shared `HTTPProvider` logic.
+    *   **Layout Awareness**: `LayoutProcessor` via `pdfplumber` for table/section extraction.
+    *   **Intelligent Routing**: `ModelRouter` dynamically selects models based on document content.
+
+4.  **Tooling & Performance**:
+    *   **CLI**: Added `benchmark`, `config`, and capabilities view to `models`.
+    *   **Caching**: SHA-256 content hashing for robust response caching.
+    *   **Metrics**: Performance monitoring for request latency and success rates.
+
+### Verification Status
+*   All new models (`Claude`, `Gemini`, `Qwen`, `Llama`, `Docling`) registered and loadable.
+*   `requirements.txt` updated with `llama-cpp-python`, `anthropic`, `google-generativeai`.
+*   CLI commands verified and operational.
+*   Async batch processing verified in API.
+
+### Future Recommendations
+*   **Deprecate Legacy Core**: Remove `docflow/core.py` as it is superseded by `processor.py`.
+*   **Frontend**: Consider a React/Next.js frontend for the API (currently CLI/API only).
+*   **Vector Store**: Add RAG capabilities for document querying.
 
 
 ## Repository Management Guidelines
